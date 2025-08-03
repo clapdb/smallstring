@@ -32,14 +32,7 @@
 
 #include <cassert>
 
-#define Assert(condition, message) \
-    do { \
-        if (!(condition)) { \
-            throw std::runtime_error(std::format("Assertion failed: {}, in file {}, line {}", message, __FILE__, __LINE__)); \
-        } \
-    } while (false)
-
-
+#define Assert(condition, message) assert((condition) && (message))
 
 namespace small {
 namespace {
@@ -703,21 +696,21 @@ class small_string_buffer
         }
         if (size <= core_type::max_short_buffer_size()) [[likely]] {
             if constexpr (NullTerminated) {
-                return {.buffer_size = static_cast<size_type>(align::AlignUpTo<8>(size + 1)),
+                return {.buffer_size = static_cast<size_type>(AlignUpTo<8>(size + 1)),
                         .core_type = CoreType::Short};
             } else {
-                return {.buffer_size = static_cast<size_type>(align::AlignUpTo<8>(size)), .core_type = CoreType::Short};
+                return {.buffer_size = static_cast<size_type>(AlignUpTo<8>(size)), .core_type = CoreType::Short};
             }
         }
         if (size <= core_type::max_median_buffer_size()) [[likely]] {  // faster than 3-way compare
             return {.buffer_size =
-                      static_cast<size_type>(align::AlignUpTo<8>(size + core_type::median_long_buffer_header_size())),
+                      static_cast<size_type>(AlignUpTo<8>(size + core_type::median_long_buffer_header_size())),
                     .core_type = CoreType::Median};
         }
         Assert(size <= core_type::max_long_buffer_size(),
                "the buffer size should be less than the max value of size_type");
         return {.buffer_size =
-                  static_cast<size_type>(align::AlignUpTo<8>(size + core_type::median_long_buffer_header_size())),
+                  static_cast<size_type>(AlignUpTo<8>(size + core_type::median_long_buffer_header_size())),
                 .core_type = CoreType::Long};
     }
 
@@ -1139,7 +1132,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
         std::copy(s.begin() + pos, s.begin() + pos + n, begin());
     }
 
-    basic_small_string(std::nullptr_t) = delete;
+    basic_small_string(std::nullptr_t): basic_small_string() {}
 
     ~basic_small_string() noexcept = default;
 
@@ -1417,7 +1410,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
         }
     }
 
-    constexpr auto reserve(size_type new_cap) -> void {
+    constexpr auto reserve(size_t new_cap) -> void {
         this->template buffer_reserve<buffer_type::Need0::Yes, true>(new_cap);
     }
 

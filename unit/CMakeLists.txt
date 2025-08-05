@@ -14,9 +14,9 @@ limitations under the License.
 
 cmake_minimum_required(VERSION 3.10)
 
-aux_source_directory(. REG_SRC)
+aux_source_directory(. UNIT_SRC)
 
-add_executable(reg_test EXCLUDE_FROM_ALL ${REG_SRC})
+add_executable(unit_test EXCLUDE_FROM_ALL ${UNIT_SRC})
 
 ## test flags
 list(APPEND TEST_FLAGS
@@ -24,6 +24,3 @@ list(APPEND TEST_FLAGS
   -DDOCTEST_CONFIG_SUPER_FAST_ASSERTS
   -Wno-deprecated
 )
-
-target_link_libraries(reg_test PRIVATE pthread doctest)
-

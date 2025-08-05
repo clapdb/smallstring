@@ -928,9 +928,11 @@ class small_string_buffer
 
    public:
     constexpr small_string_buffer([[maybe_unused]] const Allocator& allocator) noexcept : _core{allocator} {
+        #ifdef SMALL_STD_PMR_CHECK
         if constexpr (not core_type::use_std_allocator::value) {
             Assert(check_the_allocator(), "the pmr default allocator is not allowed to be used in small_string");
         }
+        #endif
     }
 
     constexpr small_string_buffer(const small_string_buffer& other) = delete;
@@ -942,10 +944,12 @@ class small_string_buffer
     // move constructor
     constexpr small_string_buffer(small_string_buffer&& other, [[maybe_unused]] const Allocator& /*unused*/) noexcept
         : _core(std::move(other._core)) {
+        #ifdef SMALL_STD_PMR_CHECK
         Assert(
           check_the_allocator(),
           "the pmr default allocator is not allowed to be used in small_string");  // very important, check the
                                                                                    // allocator incorrect injected into.
+        #endif
     }
 
     ~small_string_buffer() noexcept {
@@ -1132,7 +1136,9 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
         std::copy(s.begin() + pos, s.begin() + pos + n, begin());
     }
 
-    basic_small_string(std::nullptr_t): basic_small_string() {}
+    basic_small_string(std::nullptr_t /*unused*/) : buffer_type(Allocator{}) {
+        throw std::logic_error("basic_small_string cannot be initialized with nullptr");
+    }
 
     ~basic_small_string() noexcept = default;
 
@@ -1875,7 +1881,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
         static_assert(std::is_same_v<typename std::iterator_traits<InputIt>::value_type, Char>,
                       "the value type of the input iterator is not the same as the char type");
         Assert(first2 <= last2, "the range is valid");
-        auto pos = std::distance(begin(), first);
+        auto pos = std::distance(cbegin(), first);
         auto count = std::distance(first, last);
         if (count < 0) [[unlikely]] {
             throw std::invalid_argument("the range is invalid");
@@ -1883,7 +1889,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
         auto count2 = std::distance(first2, last2);
         if (count2 == 0) [[unlikely]] {
             // just delete the right part
-            return erase(first, last);
+            erase(first, last);
+            return *this;
         }
 
         auto [cap, old_size] = buffer_type::get_capacity_and_size();
@@ -1899,19 +1906,21 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
         if (count == count2) {
             // just replace
             std::copy(first2, last2, data() + pos);
+            return *this;
         }
 
         // else, the count != count2, need to move the right part
         // init a new string
-        basic_small_string ret{initialized_later{}, old_size - count + count2, buffer_type::get_allocator()};
+        size_t new_size = static_cast<size_t>(old_size - count + count2);
+        basic_small_string ret{initialized_later{}, new_size, buffer_type::get_allocator()};
         Char* p = ret.data();
         // copy the left party
-        std::copy(begin(), first, p);
+        std::copy(cbegin(), first, ret.begin());
         p += pos;
         // copy the new data
         std::copy(first2, last2, p);
         p += count2;
-        std::copy(last, end(), p);
+        std::copy(last, cend(), p);
         *this = std::move(ret);
         return *this;
     }

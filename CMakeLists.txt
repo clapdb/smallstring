@@ -67,6 +67,7 @@ if((${CMAKE_BUILD_TYPE} MATCHES Debug) AND CODE_COVERAGE)
   )
 endif()
 
-#add_subdirectory(unit EXCLUDE_FROM_ALL)
+add_subdirectory(doctest EXCLUDE_FROM_ALL)
+add_subdirectory(unit EXCLUDE_FROM_ALL)
 add_subdirectory(regression EXCLUDE_FROM_ALL)
 

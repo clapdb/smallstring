@@ -418,7 +418,6 @@ struct malloc_core
 
     constexpr void decrease_size_and_idle_and_set_term(size_type size_to_decrease) noexcept {
         auto flag = external.idle.flag;
-        Assert(flag > 0 and flag < 3, "the flag should be 01 or 10");
         switch (flag) {
             case 0:
                 Assert(size_to_decrease <= internal.internal_size, "the size to decrease should be less than the size");
@@ -1568,11 +1567,15 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
     }
 
     template <class StringViewLike, bool Safe = true>
+        requires(std::is_convertible_v<const StringViewLike&, std::basic_string_view<Char>> &&
+                 !std::is_convertible_v<const StringViewLike&, const Char*>)
     constexpr auto insert(const_iterator pos, const StringViewLike& t) -> iterator {
         return insert<Safe>(pos, t.data(), t.size());
     }
 
     template <class StringViewLike, bool Safe = true>
+        requires(std::is_convertible_v<const StringViewLike&, std::basic_string_view<Char>> &&
+                 !std::is_convertible_v<const StringViewLike&, const Char*>)
     constexpr auto insert(const_iterator pos, const StringViewLike& t, size_type pos2, size_type count = npos)
       -> iterator {
         return insert<Safe>(pos, t.substr(pos2, count));

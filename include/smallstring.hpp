@@ -3307,20 +3307,20 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
     /**
      * @brief Finds last occurrence of null-terminated substring
      * @param needle Null-terminated string to search for
-     * @param pos Starting position for reverse search (default: 0)
+     * @param pos Starting position for reverse search (default: npos)
      * @return Position of last match, or npos if not found
      */
-    [[nodiscard]] constexpr auto rfind(const Char* needle, size_t pos = 0) const -> size_t {
+    [[nodiscard]] constexpr auto rfind(const Char* needle, size_t pos = npos) const -> size_t {
         return rfind(needle, pos, traits_type::length(needle));
     }
 
     /**
      * @brief Finds last occurrence of another small_string
      * @param other String to search for
-     * @param pos Starting position for reverse search (default: 0)
+     * @param pos Starting position for reverse search (default: npos)
      * @return Position of last match, or npos if not found
      */
-    [[nodiscard]] constexpr auto rfind(const basic_small_string& other, size_t pos = 0) const -> size_t {
+    [[nodiscard]] constexpr auto rfind(const basic_small_string& other, size_t pos = npos) const -> size_t {
         return rfind(other.data(), pos, other.size());
     }
 
@@ -3328,13 +3328,13 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @brief Finds last occurrence of string-view-like object
      * @tparam StringViewLike Type convertible to string_view but not to const Char*
      * @param view String view object to search for
-     * @param pos Starting position for reverse search (default: 0)
+     * @param pos Starting position for reverse search (default: npos)
      * @return Position of last match, or npos if not found
      */
     template <class StringViewLike>
         requires(std::is_convertible_v<const StringViewLike&, std::basic_string_view<Char>> &&
                  !std::is_convertible_v<const StringViewLike&, const Char*>)
-    [[nodiscard]] constexpr auto rfind(const StringViewLike& view, size_t pos = 0) const -> size_t {
+    [[nodiscard]] constexpr auto rfind(const StringViewLike& view, size_t pos = npos) const -> size_t {
         return rfind(view.data(), pos, view.size());
     }
 

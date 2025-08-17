@@ -36,8 +36,8 @@ TEST_CASE("smallstring substring and copy operations") {
         CHECK(str.substr(1, 9) == "ello worl");
         
         // Out of range position should throw
-        CHECK_THROWS_AS(str.substr(100), std::out_of_range);
-        CHECK_THROWS_AS(str.substr(str.size() + 1), std::out_of_range);
+        CHECK_THROWS_AS({ auto result = str.substr(100); (void)result; }, std::out_of_range);
+        CHECK_THROWS_AS({ auto result = str.substr(str.size() + 1); (void)result; }, std::out_of_range);
         
         // Large string substr
         small::small_string large(100, 'x');
@@ -45,14 +45,14 @@ TEST_CASE("smallstring substring and copy operations") {
         large += std::string(100, 'y');
         CHECK(large.substr(100, 6) == "target");
         CHECK(large.substr(0, 10) == std::string(10, 'x'));
-        CHECK(large.substr(196) == std::string(100, 'y'));
+        CHECK(large.substr(196) == std::string(10, 'y'));
         
         // Empty string substr
         small::small_string empty;
         CHECK(empty.substr() == "");
         CHECK(empty.substr(0) == "");
         CHECK(empty.substr(0, 0) == "");
-        CHECK_THROWS_AS(empty.substr(1), std::out_of_range);
+        CHECK_THROWS_AS({ auto result = empty.substr(1); (void)result; }, std::out_of_range);
     }
     
     SUBCASE("copy method comprehensive testing") {
@@ -133,12 +133,12 @@ TEST_CASE("smallstring resize operations") {
         
         // Resize to smaller (should truncate)
         str.resize(7);
-        CHECK(str == "aaaaaaa");  // Note: resize without char defaults to truncation
+        CHECK(str == "aaaaabb");  // Note: resize without char defaults to truncation
         CHECK(str.size() == 7);
         
         // Resize to same size
         str.resize(7, 'c');
-        CHECK(str == "aaaaaaa");
+        CHECK(str == "aaaaabb");
         CHECK(str.size() == 7);
         
         // Resize to zero
@@ -209,10 +209,10 @@ TEST_CASE("smallstring resize operations") {
         
         // Multiple rapid resizes
         for (int i = 1; i <= 50; ++i) {
-            str.resize(i, static_cast<char>('A' + (i % 26)));
-            CHECK(str.size() == i);
+            str.resize(static_cast<small::small_string::size_type>(i), static_cast<char>('A' + (i % 26)));
+            CHECK(str.size() == static_cast<size_t>(i));
             if (i > 1) {
-                CHECK(str[i-1] == static_cast<char>('A' + (i % 26)));
+                CHECK(str[static_cast<small::small_string::size_type>(i-1)] == static_cast<char>('A' + (i % 26)));
             }
         }
         
@@ -231,42 +231,42 @@ TEST_CASE("smallstring replacement operations") {
         small::small_string str("hello world");
         
         // Basic replacement
-        str.replace(6, 5, "universe");
+        str.replace(static_cast<small::small_string::size_type>(6), static_cast<small::small_string::size_type>(5), "universe");
         CHECK(str == "hello universe");
         
         // Replace with shorter string
         str = "hello world";
-        str.replace(6, 5, "moon");
+        str.replace(static_cast<small::small_string::size_type>(6), static_cast<small::small_string::size_type>(5), "moon");
         CHECK(str == "hello moon");
         
         // Replace with longer string
         str = "hello world";
-        str.replace(6, 5, "beautiful galaxy");
+        str.replace(static_cast<small::small_string::size_type>(6), static_cast<small::small_string::size_type>(5), "beautiful galaxy");
         CHECK(str == "hello beautiful galaxy");
         
         // Replace at beginning
         str = "hello world";
-        str.replace(0, 5, "goodbye");
+        str.replace(static_cast<small::small_string::size_type>(0), static_cast<small::small_string::size_type>(5), "goodbye");
         CHECK(str == "goodbye world");
         
         // Replace at end
         str = "hello world";
-        str.replace(6, 5, "friend");
+        str.replace(static_cast<small::small_string::size_type>(6), static_cast<small::small_string::size_type>(5), "friend");
         CHECK(str == "hello friend");
         
         // Replace entire string
         str = "hello world";
-        str.replace(0, str.size(), "new content");
+        str.replace(static_cast<small::small_string::size_type>(0), str.size(), "new content");
         CHECK(str == "new content");
         
         // Replace with empty string (deletion)
         str = "hello world";
-        str.replace(5, 6, "");
+        str.replace(static_cast<small::small_string::size_type>(5), static_cast<small::small_string::size_type>(6), "");
         CHECK(str == "hello");
         
         // Replace zero characters (insertion)
         str = "hello world";
-        str.replace(5, 0, " beautiful");
+        str.replace(static_cast<small::small_string::size_type>(5), static_cast<small::small_string::size_type>(0), " beautiful");
         CHECK(str == "hello beautiful world");
     }
     
@@ -274,22 +274,22 @@ TEST_CASE("smallstring replacement operations") {
         small::small_string str("abcdef");
         
         // Replace with repeated character
-        str.replace(1, 3, 4, 'x');
+        str.replace(static_cast<small::small_string::size_type>(1), static_cast<small::small_string::size_type>(3), static_cast<small::small_string::size_type>(4), 'x');
         CHECK(str == "axxxxef");
         
         // Replace with zero characters
         str = "abcdef";
-        str.replace(2, 2, 0, 'y');
+        str.replace(static_cast<small::small_string::size_type>(2), static_cast<small::small_string::size_type>(2), static_cast<small::small_string::size_type>(0), 'y');
         CHECK(str == "abef");
         
         // Replace with many characters
         str = "abcdef";
-        str.replace(1, 1, 10, 'z');
+        str.replace(static_cast<small::small_string::size_type>(1), static_cast<small::small_string::size_type>(1), static_cast<small::small_string::size_type>(10), 'z');
         CHECK(str == "a" + std::string(10, 'z') + "cdef");
         
         // Replace entire middle
         str = "start middle end";
-        str.replace(6, 6, 5, '*');
+        str.replace(static_cast<small::small_string::size_type>(6), static_cast<small::small_string::size_type>(6), static_cast<small::small_string::size_type>(5), '*');
         CHECK(str == "start ***** end");
     }
     
@@ -337,24 +337,24 @@ TEST_CASE("smallstring replacement operations") {
         small::small_string str("test string");
         
         // Replace at exact boundaries
-        str.replace(0, 0, "prefix ");
+        str.replace(static_cast<small::small_string::size_type>(0), static_cast<small::small_string::size_type>(0), "prefix ");
         CHECK(str == "prefix test string");
         
         str = "test string";
-        str.replace(str.size(), 0, " suffix");
+        str.replace(str.size(), static_cast<small::small_string::size_type>(0), " suffix");
         CHECK(str == "test string suffix");
         
         // Replace with count > remaining length
         str = "test string";
-        str.replace(5, 1000, "replaced");
+        str.replace(static_cast<small::small_string::size_type>(5), static_cast<small::small_string::size_type>(1000), "replaced");
         CHECK(str == "test replaced");
         
         // Out of range position
-        CHECK_THROWS_AS(str.replace(100, 1, "x"), std::out_of_range);
+        CHECK_THROWS_AS(str.replace(static_cast<small::small_string::size_type>(100), static_cast<small::small_string::size_type>(1), "x"), std::out_of_range);
         
         // Replace across storage boundaries
         small::small_string small_str("abc");
-        small_str.replace(1, 1, "very long replacement that exceeds internal storage");
+        small_str.replace(static_cast<small::small_string::size_type>(1), static_cast<small::small_string::size_type>(1), "very long replacement that exceeds internal storage");
         CHECK(small_str.size() > 10); // Should transition to external storage
         CHECK(small_str[0] == 'a');
         CHECK(small_str[1] == 'v'); // Start of replacement
@@ -362,7 +362,7 @@ TEST_CASE("smallstring replacement operations") {
         
         // Large string replace
         small::small_string large(100, 'x');
-        large.replace(50, 10, "replacement");
+        large.replace(static_cast<small::small_string::size_type>(50), static_cast<small::small_string::size_type>(10), "replacement");
         CHECK(large.size() == 100 - 10 + 11); // 101
         CHECK(large.substr(50, 11) == "replacement");
         CHECK(large.substr(0, 50) == std::string(50, 'x'));
@@ -393,7 +393,7 @@ TEST_CASE("smallstring advanced insert operations") {
         // Insert with position from source string
         str = "hello world";
         small::small_string source("the beautiful moon");
-        str.insert(6, source, 4, 9); // "beautiful"
+        str.insert(static_cast<small::small_string::size_type>(6), source, static_cast<small::small_string::size_type>(4), static_cast<small::small_string::size_type>(10)); // "beautiful "
         CHECK(str == "hello beautiful world");
     }
     
@@ -408,7 +408,7 @@ TEST_CASE("smallstring advanced insert operations") {
         
         // Insert multiple characters
         str = "ae";
-        str.insert(str.begin() + 1, 3, 'x');
+        str.insert(str.begin() + 1, static_cast<small::small_string::size_type>(3), 'x');
         CHECK(str == "axxxe");
         
         // Insert range
@@ -424,12 +424,12 @@ TEST_CASE("smallstring advanced insert operations") {
         
         // Insert at beginning
         str = "world";
-        str.insert(str.begin(), "hello ");
+        str.insert(str.begin(), std::string_view("hello "));
         CHECK(str == "hello world");
         
         // Insert at end
         str = "hello";
-        str.insert(str.end(), " world");
+        str.insert(str.end(), std::string_view(" world"));
         CHECK(str == "hello world");
     }
     
@@ -475,7 +475,7 @@ TEST_CASE("smallstring advanced insert operations") {
         // Insert with very large count
         try {
             str.clear();
-            str.insert(0, 1000000, 'M');  // Might throw or succeed
+            str.insert(static_cast<small::small_string::size_type>(0), static_cast<small::small_string::size_type>(1000000), 'M');  // Might throw or succeed
             if (str.size() == 1000000) {
                 CHECK(str[0] == 'M');
                 CHECK(str[999999] == 'M');

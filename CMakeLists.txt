@@ -80,6 +80,8 @@ if((${CMAKE_BUILD_TYPE} MATCHES Debug) AND CODE_COVERAGE)
             --html --html-details
             --output coverage.html
             --print-summary
+            --exclude-unreachable-branches
+            --exclude-throw-branches
     
     # Generate XML coverage report for CI
     COMMAND ${GCOVR_PATH} --root ${CMAKE_SOURCE_DIR}
@@ -89,6 +91,8 @@ if((${CMAKE_BUILD_TYPE} MATCHES Debug) AND CODE_COVERAGE)
             --exclude ".*build.*"
             --exclude ".*/usr/.*"
             --xml --output coverage.xml
+            --exclude-unreachable-branches
+            --exclude-throw-branches
     
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Generating code coverage report"

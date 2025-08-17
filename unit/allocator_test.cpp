@@ -367,19 +367,17 @@ TEST_CASE("smallstring resource management") {
         // Shrink content but not capacity
         str.resize(10);
         capacities.push_back(str.capacity());
-        
-        // Verify capacity never decreased and grew reasonably
-        for (size_t i = 1; i < capacities.size(); ++i) {
-            CHECK(capacities[i] >= capacities[i-1]); // Never decrease
-            if (capacities[i] > capacities[i-1]) {
-                CHECK(capacities[i] <= capacities[i-1] * 4); // Reasonable growth
-            }
-        }
-        
+
+        CHECK(capacities[0] == 6); // empty internal string's cap
+        CHECK(capacities[1] == 7); // "initial" will alignUp to 8, then reduce a '\0'
+        CHECK(capacities[2] == 103); // 100 will alignUp to 104, then reduce a '\0'
+        CHECK(capacities[3] == 103); // resize will not change capacity
+
         // shrink_to_fit might reduce capacity
         auto cap_before_shrink = str.capacity();
         str.shrink_to_fit();
         CHECK(str.capacity() >= str.size());
+        CHECK(str.capacity() <= cap_before_shrink); // Should not increase
         // Can't guarantee it actually shrunk (implementation-defined)
     }
     

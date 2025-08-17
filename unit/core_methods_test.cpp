@@ -455,13 +455,13 @@ TEST_CASE("smallstring C++20 string methods") {
 
 TEST_CASE("smallstring string view conversion") {
     SUBCASE("implicit conversion to string_view") {
-        small::small_string str("test conversion");
+        small::small_string str("test conversion!");
         
         // Implicit conversion
         std::string_view sv = str;
         CHECK(sv.data() == str.data());
         CHECK(sv.size() == str.size());
-        CHECK(sv == "test conversion");
+        CHECK(sv == "test conversion!");
         
         // Use in function expecting string_view
         auto test_func = [](std::string_view view) {
@@ -478,10 +478,10 @@ TEST_CASE("smallstring string view conversion") {
         
         // Test modification doesn't affect original conversion
         std::string_view sv_before = str;
-        str.push_back('!');
+        str.push_back('?');
         // sv_before now points to modified data, but size is old
         // This is expected behavior for string_view
-        CHECK(sv_before.data() == str.data());
+        CHECK_EQ(sv_before.data(), str.data());
     }
     
     SUBCASE("explicit string_view operations") {

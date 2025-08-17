@@ -28,7 +28,7 @@ TEST_CASE("smallstring advanced find operations") {
         
         // Single character at boundaries
         CHECK(str.find('h', 0) == 0);
-        CHECK(str.find('o', 16) == small::small_string::npos);
+        CHECK(str.find('o', 16) == 16);
         
         // With internal vs external string
         small::small_string small_str("abc");
@@ -44,7 +44,7 @@ TEST_CASE("smallstring advanced find operations") {
         // Basic rfind functionality
         CHECK(str.rfind("world") == 18);
         CHECK(str.rfind("hello") == 12);
-        CHECK(str.rfind('d') == 23);
+        CHECK(str.rfind('d') == 22);
         
         // rfind with position constraints
         CHECK(str.rfind("hello", 10) == 0);
@@ -62,7 +62,7 @@ TEST_CASE("smallstring advanced find operations") {
         
         // Position beyond string size
         CHECK(str.rfind("hello", 1000) == 12);
-        CHECK(str.rfind('o', 1000) == 22);
+        CHECK(str.rfind('o', 1000) == 19);
         
         // Overlapping patterns
         small::small_string overlap("aaaa");
@@ -116,7 +116,7 @@ TEST_CASE("smallstring advanced find operations") {
         small::small_string str("hello, beautiful world!");
         
         // Basic find_last_of
-        CHECK(str.find_last_of("aeiou") == 19); // 'o'
+        CHECK(str.find_last_of("aeiou") == 18); // 'o'
         CHECK(str.find_last_of("xyz") == small::small_string::npos);
         
         // Single character
@@ -124,16 +124,16 @@ TEST_CASE("smallstring advanced find operations") {
         CHECK(str.find_last_of('z') == small::small_string::npos);
         
         // With position constraint
-        CHECK(str.find_last_of("aeiou", 10) == 9); // 'i'
-        CHECK(str.find_last_of("l", 15) == 3);
+        CHECK(str.find_last_of("aeiou", 10) == 10); // 'u'
+        CHECK(str.find_last_of("l", 15) == 15);
         
         // Multiple character set
-        CHECK(str.find_last_of("!,") == 23); // '!'
-        CHECK(str.find_last_of("ld") == 22); // 'd'
+        CHECK(str.find_last_of("!,") == 22); // '!'
+        CHECK(str.find_last_of("ld") == 21); // 'd'
         
         // Position at exact match
         CHECK(str.find_last_of("l", 20) == 20);
-        CHECK(str.find_last_of("l", 19) == 3);
+        CHECK(str.find_last_of("l", 19) == 15);
         
         // Empty search string
         CHECK(str.find_last_of("") == small::small_string::npos);
@@ -193,7 +193,7 @@ TEST_CASE("smallstring advanced find operations") {
         
         // With position
         CHECK(str.find_last_not_of(" ", 8) == 8); // 'o'
-        CHECK(str.find_last_not_of("world ", 5) == 4); // 'o'
+        CHECK(str.find_last_not_of("world ", 5) == 1); // 'e'
         
         // Complex patterns
         small::small_string path("/path/to/file.txt");

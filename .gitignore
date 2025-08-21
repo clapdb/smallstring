@@ -1,0 +1,11 @@
+# Build directories
+build.*/
+
+# Generated files
+compile_commands.json
+.cache/
+.clangd
+
+# Coverage files
+*.gcov
+*.gcov.json.gz

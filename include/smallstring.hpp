@@ -21,7 +21,6 @@
 #include <cstring>
 #include <format>
 #include <initializer_list>
-#include <ios>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -29,6 +28,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 #include <cassert>
 
@@ -746,19 +746,6 @@ struct malloc_core
         body = temp_body;
     }
 
-    /**
-     * @brief Ultra-fast initialization to empty string state
-     * @note Sets necessary zero bytes to create valid empty string
-     * @note init_slice[7] = 0 creates internal storage with size 0
-     * @note init_slice[0] = 0 provides null termination when required
-     */
-    [[gnu::always_inline]] void fastest_zero_init() {
-        if constexpr (NullTerminated) {
-            init_slice[0] = 0;
-        }
-        init_slice[7] = 0;
-    }
-
     // Constructors and lifecycle management
     
     /**
@@ -767,9 +754,7 @@ struct malloc_core
      * @note Initializes to empty string with internal storage
      */
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    constexpr malloc_core([[maybe_unused]] const std::allocator<Char>& unused = std::allocator<Char>{}) noexcept {
-        fastest_zero_init();
-    }
+    constexpr malloc_core([[maybe_unused]] const std::allocator<Char>& unused = std::allocator<Char>{}) noexcept : body{0} { }
     
     /// Copy constructor - copies entire storage state
     constexpr malloc_core(const malloc_core& other) noexcept : body(other.body) {}
@@ -779,7 +764,7 @@ struct malloc_core
         : body(other.body) {}
         
     /// Move constructor - transfers ownership and resets source to empty
-    constexpr malloc_core(malloc_core&& gone) noexcept : body(gone.body) { gone.fastest_zero_init(); }
+    constexpr malloc_core(malloc_core&& gone) noexcept : body{std::exchange(gone.body, 0)} { }
     ~malloc_core() = default;
     /// Copy assignment deleted - cores should not be reassigned after construction
     auto operator=(const malloc_core& other) -> malloc_core& = delete;

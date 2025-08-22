@@ -107,4 +107,5 @@ endif()
 add_subdirectory(doctest EXCLUDE_FROM_ALL)
 add_subdirectory(unit EXCLUDE_FROM_ALL)
 add_subdirectory(regression EXCLUDE_FROM_ALL)
+add_subdirectory(benchmark EXCLUDE_FROM_ALL)
 

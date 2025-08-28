@@ -731,6 +731,288 @@ BENCHMARK_F(BenchmarkFixture, SmallByteString_UnorderedMapInsertMedium)(benchmar
 
 
 // =============================================================================
+// Memory Footprint Benchmarks
+// =============================================================================
+
+template<typename StringType>
+size_t calculate_vector_memory_usage(const std::vector<StringType>& vec) {
+    size_t total_size = sizeof(std::vector<StringType>);
+    total_size += vec.capacity() * sizeof(StringType);
+    
+    for (const auto& str : vec) {
+        if constexpr (std::is_same_v<StringType, std::string>) {
+            if (str.capacity() > 15) {
+                total_size += str.capacity();
+            }
+        } else {
+            total_size += str.capacity();
+        }
+    }
+    
+    return total_size;
+}
+
+template<typename MapType>
+size_t calculate_map_memory_usage(const MapType& map) {
+    size_t total_size = sizeof(MapType);
+    
+    constexpr size_t node_overhead = 32;
+    
+    for (const auto& pair : map) {
+        total_size += node_overhead;
+        total_size += sizeof(pair.first);
+        total_size += sizeof(pair.second);
+        
+        if constexpr (std::is_same_v<typename MapType::key_type, std::string>) {
+            if (pair.first.capacity() > 15) {
+                total_size += pair.first.capacity();
+            }
+        } else {
+            total_size += pair.first.capacity();
+        }
+    }
+    
+    return total_size;
+}
+
+template<typename UnorderedMapType>
+size_t calculate_unordered_map_memory_usage(const UnorderedMapType& map) {
+    size_t total_size = sizeof(UnorderedMapType);
+    
+    size_t bucket_count = map.bucket_count();
+    total_size += bucket_count * sizeof(void*);
+    
+    constexpr size_t node_overhead = 24;
+    
+    for (const auto& pair : map) {
+        total_size += node_overhead;
+        total_size += sizeof(pair.first);
+        total_size += sizeof(pair.second);
+        
+        if constexpr (std::is_same_v<typename UnorderedMapType::key_type, std::string>) {
+            if (pair.first.capacity() > 15) {
+                total_size += pair.first.capacity();
+            }
+        } else {
+            total_size += pair.first.capacity();
+        }
+    }
+    
+    return total_size;
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_StdString_Vector)(benchmark::State& state) {
+    std::vector<std::string> vec;
+    vec.reserve(1000);
+    
+    for (const auto& str : short_strings) {
+        vec.push_back(str);
+    }
+    
+    size_t memory_usage = calculate_vector_memory_usage(vec);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / vec.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_SmallString_Vector)(benchmark::State& state) {
+    std::vector<small::small_string> vec;
+    vec.reserve(1000);
+    
+    for (const auto& str : short_strings) {
+        vec.push_back(small::small_string(str));
+    }
+    
+    size_t memory_usage = calculate_vector_memory_usage(vec);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / vec.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_SmallByteString_Vector)(benchmark::State& state) {
+    std::vector<small::small_byte_string> vec;
+    vec.reserve(1000);
+    
+    for (const auto& str : short_strings) {
+        vec.push_back(small::small_byte_string(str));
+    }
+    
+    size_t memory_usage = calculate_vector_memory_usage(vec);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / vec.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_StdString_Map)(benchmark::State& state) {
+    std::map<std::string, int> map;
+    
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(short_strings[i], static_cast<int>(i));
+    }
+    
+    size_t memory_usage = calculate_map_memory_usage(map);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / map.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_SmallString_Map)(benchmark::State& state) {
+    std::map<small::small_string, int> map;
+    
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(small::small_string(short_strings[i]), static_cast<int>(i));
+    }
+    
+    size_t memory_usage = calculate_map_memory_usage(map);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / map.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_SmallByteString_Map)(benchmark::State& state) {
+    std::map<small::small_byte_string, int> map;
+    
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(small::small_byte_string(short_strings[i]), static_cast<int>(i));
+    }
+    
+    size_t memory_usage = calculate_map_memory_usage(map);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / map.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_StdString_UnorderedMap)(benchmark::State& state) {
+    std::unordered_map<std::string, int> map;
+    
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(short_strings[i], static_cast<int>(i));
+    }
+    
+    size_t memory_usage = calculate_unordered_map_memory_usage(map);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / map.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_SmallString_UnorderedMap)(benchmark::State& state) {
+    std::unordered_map<small::small_string, int> map;
+    
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(small::small_string(short_strings[i]), static_cast<int>(i));
+    }
+    
+    size_t memory_usage = calculate_unordered_map_memory_usage(map);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / map.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_SmallByteString_UnorderedMap)(benchmark::State& state) {
+    std::unordered_map<small::small_byte_string, int> map;
+    
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(small::small_byte_string(short_strings[i]), static_cast<int>(i));
+    }
+    
+    size_t memory_usage = calculate_unordered_map_memory_usage(map);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / map.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_StdString_VectorMedium)(benchmark::State& state) {
+    std::vector<std::string> vec;
+    vec.reserve(1000);
+    
+    for (const auto& str : medium_strings) {
+        vec.push_back(str);
+    }
+    
+    size_t memory_usage = calculate_vector_memory_usage(vec);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / vec.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_SmallString_VectorMedium)(benchmark::State& state) {
+    std::vector<small::small_string> vec;
+    vec.reserve(1000);
+    
+    for (const auto& str : medium_strings) {
+        vec.push_back(small::small_string(str));
+    }
+    
+    size_t memory_usage = calculate_vector_memory_usage(vec);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / vec.size();
+}
+
+BENCHMARK_F(BenchmarkFixture, MemoryFootprint_SmallByteString_VectorMedium)(benchmark::State& state) {
+    std::vector<small::small_byte_string> vec;
+    vec.reserve(1000);
+    
+    for (const auto& str : medium_strings) {
+        vec.push_back(small::small_byte_string(str));
+    }
+    
+    size_t memory_usage = calculate_vector_memory_usage(vec);
+    
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(memory_usage);
+    }
+    
+    state.counters["MemoryBytes"] = static_cast<double>(memory_usage);
+    state.counters["MemoryPerItem"] = static_cast<double>(memory_usage) / vec.size();
+}
+
+
+// =============================================================================
 // Memory Usage Information
 // =============================================================================
 

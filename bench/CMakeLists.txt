@@ -1,11 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
-# Find Google Benchmark
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(BENCHMARK REQUIRED benchmark)
-
 # Benchmark executable
 add_executable(string_benchmark EXCLUDE_FROM_ALL benchmark_main.cpp)
+
+# Ensure benchmark library is built first
+add_dependencies(string_benchmark benchmark)
 
 # Compiler flags for benchmarks - disable warnings for optimization
 list(APPEND BENCHMARK_FLAGS
@@ -14,20 +13,28 @@ list(APPEND BENCHMARK_FLAGS
     -march=native
     -Wno-error
     -Wno-uninitialized
+    -Wno-deprecated-declarations
 )
 
 target_compile_options(string_benchmark PRIVATE ${BENCHMARK_FLAGS})
 
-# Link libraries
+# Link libraries - use the benchmark library
 target_link_libraries(string_benchmark PRIVATE 
     pthread
-    ${BENCHMARK_LIBRARIES}
+    benchmark
 )
+
+# Force linking with libc++ when using Clang
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(string_benchmark PRIVATE -stdlib=libc++)
+    target_link_options(string_benchmark PRIVATE -stdlib=libc++)
+endif()
 
 # Include directories
 target_include_directories(string_benchmark PRIVATE 
+    ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}
-    ${BENCHMARK_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/benchmark/include
 )
 
 # Add benchmark target to build all benchmarks

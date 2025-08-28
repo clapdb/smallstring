@@ -107,5 +107,25 @@ endif()
 add_subdirectory(doctest EXCLUDE_FROM_ALL)
 add_subdirectory(unit EXCLUDE_FROM_ALL)
 add_subdirectory(regression EXCLUDE_FROM_ALL)
+add_subdirectory(bench EXCLUDE_FROM_ALL)
+
+# Disable benchmark testing to avoid Google Test dependency
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Enable testing of the benchmark library." FORCE)
+set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "Enable building the unit tests which depend on gtest" FORCE)
+set(BENCHMARK_ENABLE_WERROR OFF CACHE BOOL "Build Release candidates with -Werror." FORCE)
+
+# Temporarily disable Werror for benchmark library compilation
+set(OLD_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+string(REPLACE "-Werror" "-Wno-error" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+
+# If using Clang, also ensure benchmark library uses libc++
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++")
+endif()
+
 add_subdirectory(benchmark EXCLUDE_FROM_ALL)
+
+# Restore original flags
+set(CMAKE_CXX_FLAGS "${OLD_CMAKE_CXX_FLAGS}")
 

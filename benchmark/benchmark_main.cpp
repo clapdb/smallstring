@@ -8,7 +8,7 @@
 
 class BenchmarkFixture : public ::benchmark::Fixture {
 public:
-    void SetUp(const ::benchmark::State& state) override {
+    void SetUp([[maybe_unused]] const ::benchmark::State& state) override {
         // Generate test data for various string sizes
         short_strings = generate_strings(1000, 3, 7);      // SSO range
         medium_strings = generate_strings(1000, 15, 50);   // Short range
@@ -410,95 +410,7 @@ BENCHMARK_F(BenchmarkFixture, SmallByteString_Erase)(benchmark::State& state) {
     }
 }
 
-// =============================================================================
-// Bulk Operations
-// =============================================================================
 
-BENCHMARK_F(BenchmarkFixture, StdString_VectorCreation)(benchmark::State& state) {
-    const size_t num_strings = state.range(0);
-    for (auto _ : state) {
-        std::vector<std::string> strings;
-        strings.reserve(num_strings);
-        for (size_t i = 0; i < num_strings; ++i) {
-            strings.emplace_back(short_strings[i % short_strings.size()]);
-        }
-        benchmark::DoNotOptimize(strings);
-    }
-    state.SetComplexityN(state.range(0));
-}
-
-BENCHMARK_F(BenchmarkFixture, SmallString_VectorCreation)(benchmark::State& state) {
-    const size_t num_strings = state.range(0);
-    for (auto _ : state) {
-        std::vector<small::small_string> strings;
-        strings.reserve(num_strings);
-        for (size_t i = 0; i < num_strings; ++i) {
-            strings.emplace_back(short_strings[i % short_strings.size()]);
-        }
-        benchmark::DoNotOptimize(strings);
-    }
-    state.SetComplexityN(state.range(0));
-}
-
-BENCHMARK_F(BenchmarkFixture, SmallByteString_VectorCreation)(benchmark::State& state) {
-    const size_t num_strings = state.range(0);
-    for (auto _ : state) {
-        std::vector<small::small_byte_string> strings;
-        strings.reserve(num_strings);
-        for (size_t i = 0; i < num_strings; ++i) {
-            strings.emplace_back(short_strings[i % short_strings.size()]);
-        }
-        benchmark::DoNotOptimize(strings);
-    }
-    state.SetComplexityN(state.range(0));
-}
-
-// Register vector creation benchmarks with different sizes
-BENCHMARK_REGISTER_F(BenchmarkFixture, StdString_VectorCreation)->RangeMultiplier(10)->Range(100, 10000)->Complexity();
-BENCHMARK_REGISTER_F(BenchmarkFixture, SmallString_VectorCreation)->RangeMultiplier(10)->Range(100, 10000)->Complexity();
-BENCHMARK_REGISTER_F(BenchmarkFixture, SmallByteString_VectorCreation)->RangeMultiplier(10)->Range(100, 10000)->Complexity();
-
-// =============================================================================
-// String Size Variation Benchmarks
-// =============================================================================
-
-static void CustomArguments(benchmark::internal::Benchmark* b) {
-    // Test different string sizes: 0, 4, 8, 16, 32, 64, 128, 256, 512, 1024
-    for (int i = 0; i <= 1024; i = (i == 0) ? 4 : i * 2) {
-        b->Arg(i);
-    }
-}
-
-static void BM_StdString_ConstructBySize(benchmark::State& state) {
-    std::string test_str(state.range(0), 'X');
-    for (auto _ : state) {
-        std::string s(test_str);
-        benchmark::DoNotOptimize(s);
-    }
-    state.SetBytesProcessed(int64_t(state.iterations()) * int64_t(state.range(0)));
-}
-
-static void BM_SmallString_ConstructBySize(benchmark::State& state) {
-    std::string test_str(state.range(0), 'X');
-    for (auto _ : state) {
-        small::small_string s(test_str);
-        benchmark::DoNotOptimize(s);
-    }
-    state.SetBytesProcessed(int64_t(state.iterations()) * int64_t(state.range(0)));
-}
-
-static void BM_SmallByteString_ConstructBySize(benchmark::State& state) {
-    std::string test_str(state.range(0), 'X');
-    for (auto _ : state) {
-        small::small_byte_string s(test_str);
-        benchmark::DoNotOptimize(s);
-    }
-    state.SetBytesProcessed(int64_t(state.iterations()) * int64_t(state.range(0)));
-}
-
-BENCHMARK(BM_StdString_ConstructBySize)->Apply(CustomArguments);
-BENCHMARK(BM_SmallString_ConstructBySize)->Apply(CustomArguments);
-BENCHMARK(BM_SmallByteString_ConstructBySize)->Apply(CustomArguments);
 
 // =============================================================================
 // Memory Usage Information

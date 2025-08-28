@@ -13,7 +13,6 @@ list(APPEND BENCHMARK_FLAGS
     -DNDEBUG
     -march=native
     -Wno-error
-    -Wno-maybe-uninitialized
     -Wno-uninitialized
 )
 

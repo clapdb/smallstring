@@ -4,6 +4,8 @@
 #include <random>
 #include <algorithm>
 #include <iostream>
+#include <map>
+#include <unordered_map>
 #include "include/smallstring.hpp"
 
 class BenchmarkFixture : public ::benchmark::Fixture {
@@ -410,6 +412,322 @@ BENCHMARK_F(BenchmarkFixture, SmallByteString_Erase)(benchmark::State& state) {
     }
 }
 
+// =============================================================================
+// Container Benchmarks - std::map/std::unordered_map as key
+// =============================================================================
+
+BENCHMARK_F(BenchmarkFixture, StdString_MapInsert)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::map<std::string, int> map;
+        for (size_t i = 0; i < short_strings.size(); ++i) {
+            map.emplace(short_strings[i], static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallString_MapInsert)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::map<small::small_string, int> map;
+        for (size_t i = 0; i < short_strings.size(); ++i) {
+            map.emplace(small::small_string(short_strings[i]), static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallByteString_MapInsert)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::map<small::small_byte_string, int> map;
+        for (size_t i = 0; i < short_strings.size(); ++i) {
+            map.emplace(small::small_byte_string(short_strings[i]), static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, StdString_MapLookup)(benchmark::State& state) {
+    std::map<std::string, int> map;
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(short_strings[i], static_cast<int>(i));
+    }
+    
+    for (auto _ : state) {
+        for (const auto& str : short_strings) {
+            auto it = map.find(str);
+            benchmark::DoNotOptimize(it);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallString_MapLookup)(benchmark::State& state) {
+    std::map<small::small_string, int> map;
+    std::vector<small::small_string> keys;
+    keys.reserve(short_strings.size());
+    
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        small::small_string key(short_strings[i]);
+        map.emplace(key, static_cast<int>(i));
+        keys.push_back(key);
+    }
+    
+    for (auto _ : state) {
+        for (const auto& key : keys) {
+            auto it = map.find(key);
+            benchmark::DoNotOptimize(it);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallByteString_MapLookup)(benchmark::State& state) {
+    std::map<small::small_byte_string, int> map;
+    std::vector<small::small_byte_string> keys;
+    keys.reserve(short_strings.size());
+    
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        small::small_byte_string key(short_strings[i]);
+        map.emplace(key, static_cast<int>(i));
+        keys.push_back(key);
+    }
+    
+    for (auto _ : state) {
+        for (const auto& key : keys) {
+            auto it = map.find(key);
+            benchmark::DoNotOptimize(it);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, StdString_MapIteration)(benchmark::State& state) {
+    std::map<std::string, int> map;
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(short_strings[i], static_cast<int>(i));
+    }
+    
+    for (auto _ : state) {
+        for (const auto& pair : map) {
+            benchmark::DoNotOptimize(pair.first);
+            benchmark::DoNotOptimize(pair.second);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallString_MapIteration)(benchmark::State& state) {
+    std::map<small::small_string, int> map;
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(small::small_string(short_strings[i]), static_cast<int>(i));
+    }
+    
+    for (auto _ : state) {
+        for (const auto& pair : map) {
+            benchmark::DoNotOptimize(pair.first);
+            benchmark::DoNotOptimize(pair.second);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallByteString_MapIteration)(benchmark::State& state) {
+    std::map<small::small_byte_string, int> map;
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(small::small_byte_string(short_strings[i]), static_cast<int>(i));
+    }
+    
+    for (auto _ : state) {
+        for (const auto& pair : map) {
+            benchmark::DoNotOptimize(pair.first);
+            benchmark::DoNotOptimize(pair.second);
+        }
+    }
+}
+
+// Test with medium-sized strings for comparison
+BENCHMARK_F(BenchmarkFixture, StdString_MapInsertMedium)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::map<std::string, int> map;
+        for (size_t i = 0; i < medium_strings.size(); ++i) {
+            map.emplace(medium_strings[i], static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallString_MapInsertMedium)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::map<small::small_string, int> map;
+        for (size_t i = 0; i < medium_strings.size(); ++i) {
+            map.emplace(small::small_string(medium_strings[i]), static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallByteString_MapInsertMedium)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::map<small::small_byte_string, int> map;
+        for (size_t i = 0; i < medium_strings.size(); ++i) {
+            map.emplace(small::small_byte_string(medium_strings[i]), static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+// =============================================================================
+// Container Benchmarks - std::unordered_map as key
+// =============================================================================
+
+BENCHMARK_F(BenchmarkFixture, StdString_UnorderedMapInsert)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::unordered_map<std::string, int> map;
+        for (size_t i = 0; i < short_strings.size(); ++i) {
+            map.emplace(short_strings[i], static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallString_UnorderedMapInsert)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::unordered_map<small::small_string, int> map;
+        for (size_t i = 0; i < short_strings.size(); ++i) {
+            map.emplace(small::small_string(short_strings[i]), static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallByteString_UnorderedMapInsert)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::unordered_map<small::small_byte_string, int> map;
+        for (size_t i = 0; i < short_strings.size(); ++i) {
+            map.emplace(small::small_byte_string(short_strings[i]), static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, StdString_UnorderedMapLookup)(benchmark::State& state) {
+    std::unordered_map<std::string, int> map;
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(short_strings[i], static_cast<int>(i));
+    }
+    
+    for (auto _ : state) {
+        for (const auto& str : short_strings) {
+            auto it = map.find(str);
+            benchmark::DoNotOptimize(it);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallString_UnorderedMapLookup)(benchmark::State& state) {
+    std::unordered_map<small::small_string, int> map;
+    std::vector<small::small_string> keys;
+    keys.reserve(short_strings.size());
+    
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        small::small_string key(short_strings[i]);
+        map.emplace(key, static_cast<int>(i));
+        keys.push_back(key);
+    }
+    
+    for (auto _ : state) {
+        for (const auto& key : keys) {
+            auto it = map.find(key);
+            benchmark::DoNotOptimize(it);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallByteString_UnorderedMapLookup)(benchmark::State& state) {
+    std::unordered_map<small::small_byte_string, int> map;
+    std::vector<small::small_byte_string> keys;
+    keys.reserve(short_strings.size());
+    
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        small::small_byte_string key(short_strings[i]);
+        map.emplace(key, static_cast<int>(i));
+        keys.push_back(key);
+    }
+    
+    for (auto _ : state) {
+        for (const auto& key : keys) {
+            auto it = map.find(key);
+            benchmark::DoNotOptimize(it);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, StdString_UnorderedMapIteration)(benchmark::State& state) {
+    std::unordered_map<std::string, int> map;
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(short_strings[i], static_cast<int>(i));
+    }
+    
+    for (auto _ : state) {
+        for (const auto& pair : map) {
+            benchmark::DoNotOptimize(pair.first);
+            benchmark::DoNotOptimize(pair.second);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallString_UnorderedMapIteration)(benchmark::State& state) {
+    std::unordered_map<small::small_string, int> map;
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(small::small_string(short_strings[i]), static_cast<int>(i));
+    }
+    
+    for (auto _ : state) {
+        for (const auto& pair : map) {
+            benchmark::DoNotOptimize(pair.first);
+            benchmark::DoNotOptimize(pair.second);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallByteString_UnorderedMapIteration)(benchmark::State& state) {
+    std::unordered_map<small::small_byte_string, int> map;
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        map.emplace(small::small_byte_string(short_strings[i]), static_cast<int>(i));
+    }
+    
+    for (auto _ : state) {
+        for (const auto& pair : map) {
+            benchmark::DoNotOptimize(pair.first);
+            benchmark::DoNotOptimize(pair.second);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, StdString_UnorderedMapInsertMedium)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::unordered_map<std::string, int> map;
+        for (size_t i = 0; i < medium_strings.size(); ++i) {
+            map.emplace(medium_strings[i], static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallString_UnorderedMapInsertMedium)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::unordered_map<small::small_string, int> map;
+        for (size_t i = 0; i < medium_strings.size(); ++i) {
+            map.emplace(small::small_string(medium_strings[i]), static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallByteString_UnorderedMapInsertMedium)(benchmark::State& state) {
+    for (auto _ : state) {
+        std::unordered_map<small::small_byte_string, int> map;
+        for (size_t i = 0; i < medium_strings.size(); ++i) {
+            map.emplace(small::small_byte_string(medium_strings[i]), static_cast<int>(i));
+        }
+        benchmark::DoNotOptimize(map);
+    }
+}
 
 
 // =============================================================================

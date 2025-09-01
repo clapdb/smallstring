@@ -15,6 +15,7 @@
 #pragma once
 #include <sys/types.h>
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -30,11 +31,14 @@
 #include <type_traits>
 #include <utility>
 
-#include <cassert>
-
-#define Assert(condition, message) assert((condition) && (message))
-
 namespace small {
+namespace detail {
+    template<typename T>
+    constexpr void assert_with_message(bool condition, T&& message) noexcept {
+        assert(condition && message);
+    }
+}
+#define Assert(condition, message) ::small::detail::assert_with_message((condition), (message))
 namespace {
 inline constexpr uint64_t kMinAlignSize = 8;  // 64 bits for modern cpu
 /**
@@ -54,7 +58,7 @@ template <uint64_t N>
     return (n + N - 1) & static_cast<uint64_t>(-N);
 }
 
-} // namespace
+}  // namespace
 
 /**
  * @brief Storage strategy enumeration for small string optimization
@@ -70,21 +74,21 @@ enum class CoreType : uint8_t
      * @note Most efficient for short strings, zero allocation overhead
      */
     Internal = 0,
-    
+
     /**
      * @brief Short external storage for small strings (up to 255 characters)
      * @note Uses external heap allocation with compact 8-byte metadata
      * @note Capacity limited to 32 * 8 bytes, size up to 256 characters
      */
     Short = 1,
-    
+
     /**
      * @brief Median external storage with idle capacity tracking (up to 16383 characters)
      * @note Uses buffer header to store capacity and size information
      * @note Tracks idle capacity for efficient append operations without reallocation
      */
     Median = 2,
-    
+
     /**
      * @brief Long external storage for large strings (unlimited size)
      * @note Uses buffer header with full capacity and size tracking
@@ -97,7 +101,7 @@ enum class CoreType : uint8_t
 /// @note Used for efficient type checking and storage classification
 constexpr inline auto kIsInternal = static_cast<uint8_t>(CoreType::Internal);
 
-/// @brief Constant representing the Short core type as uint8_t  
+/// @brief Constant representing the Short core type as uint8_t
 /// @note Used for efficient type checking and storage classification
 constexpr inline auto kIsShort = static_cast<uint8_t>(CoreType::Short);
 
@@ -117,8 +121,8 @@ constexpr inline auto kIsLong = static_cast<uint8_t>(CoreType::Long);
 template <typename S>
 struct buffer_type_and_size
 {
-    S buffer_size;        ///< Total size of allocated buffer in bytes
-    CoreType core_type;   ///< Storage strategy: Internal/Short/Median/Long
+    S buffer_size;       ///< Total size of allocated buffer in bytes
+    CoreType core_type;  ///< Storage strategy: Internal/Short/Median/Long
 };
 
 static_assert(sizeof(buffer_type_and_size<uint32_t>) == 8);
@@ -132,8 +136,8 @@ static_assert(sizeof(buffer_type_and_size<uint32_t>) == 8);
 template <typename S>
 struct capacity_and_size
 {
-    S capacity;   ///< Maximum character capacity (excluding null terminator)
-    S size;       ///< Current number of characters in string
+    S capacity;  ///< Maximum character capacity (excluding null terminator)
+    S size;      ///< Current number of characters in string
 };
 
 static_assert(sizeof(capacity_and_size<uint32_t>) == 8);
@@ -156,9 +160,9 @@ struct malloc_core
      */
     struct internal_core
     {
-        Char data[7];                 ///< Embedded character storage (6 chars + null term or 7 chars)
-        uint8_t internal_size : 6;    ///< Current string length (0-63, but limited by data array)
-        uint8_t flag : 2;             ///< Storage type flag: must be 00 for Internal storage
+        Char data[7];               ///< Embedded character storage (6 chars + null term or 7 chars)
+        uint8_t internal_size : 6;  ///< Current string length (0-63, but limited by data array)
+        uint8_t flag : 2;           ///< Storage type flag: must be 00 for Internal storage
     };  // struct internal_core
     static_assert(sizeof(internal_core) == 8);
 
@@ -181,9 +185,9 @@ struct malloc_core
          */
         struct cap_and_size
         {
-            uint8_t cap : 5;      ///< Encoded capacity: real_capacity = (cap + 1) * 8 (range: 8-256)
-            uint16_t size : 9;    ///< Current string size (max 256 characters)
-            uint8_t flag : 2;     ///< Storage type flag: must be 01 for Short storage
+            uint8_t cap : 5;    ///< Encoded capacity: real_capacity = (cap + 1) * 8 (range: 8-256)
+            uint16_t size : 9;  ///< Current string size (max 256 characters)
+            uint8_t flag : 2;   ///< Storage type flag: must be 01 for Short storage
         };
 
         /**
@@ -193,8 +197,8 @@ struct malloc_core
          */
         struct idle_cap
         {
-            uint16_t idle_or_ignore : 14; ///< Available unused capacity (max 16383 chars)
-            uint8_t flag : 2;             ///< Storage type flag: 10=Median, 11=Long
+            uint16_t idle_or_ignore : 14;  ///< Available unused capacity (max 16383 chars)
+            uint8_t flag : 2;              ///< Storage type flag: 10=Median, 11=Long
         };
 
         static_assert(sizeof(idle_cap) == 2);
@@ -203,14 +207,14 @@ struct malloc_core
          * @brief Union providing different views of the 16-bit metadata field
          * @note Interpretation depends on storage type flag:
          *       - flag=01: cap_size for Short buffers
-         *       - flag=10/11: idle for Median/Long buffers  
+         *       - flag=10/11: idle for Median/Long buffers
          *       - mask: raw 16-bit value for direct manipulation
          */
         union
         {
-            idle_cap idle;         ///< Idle capacity info for Median/Long storage
-            cap_and_size cap_size; ///< Capacity/size info for Short storage
-            uint16_t mask;         ///< Raw metadata bits for atomic operations
+            idle_cap idle;          ///< Idle capacity info for Median/Long storage
+            cap_and_size cap_size;  ///< Capacity/size info for Short storage
+            uint16_t mask;          ///< Raw metadata bits for atomic operations
         };
 
         /**
@@ -237,10 +241,10 @@ struct malloc_core
      */
     union
     {
-        int64_t body;           ///< Raw 64-bit value for atomic operations and fast copying
-        Char init_slice[8];     ///< Initialization helper: init[7]=0 makes empty string
-        internal_core internal; ///< Small string storage (embedded data + metadata)
-        external_core external; ///< Large string storage (pointer + metadata)
+        int64_t body;            ///< Raw 64-bit value for atomic operations and fast copying
+        Char init_slice[8];      ///< Initialization helper: init[7]=0 makes empty string
+        internal_core internal;  ///< Small string storage (embedded data + metadata)
+        external_core external;  ///< Large string storage (pointer + metadata)
     };
 
     /**
@@ -396,8 +400,8 @@ struct malloc_core
      * @note Only valid for Median and Long buffer types
      * @note Verifies decrease amount doesn't exceed current size
      */
-    [[nodiscard, gnu::always_inline]] constexpr auto decrease_size_to_buffer_header(size_type size_to_decrease) const noexcept
-      -> size_type {
+    [[nodiscard, gnu::always_inline]] constexpr auto decrease_size_to_buffer_header(
+      size_type size_to_decrease) const noexcept -> size_type {
         Assert(external.idle.flag > 1, "the flag should be 10 / 11");
         // check the new_size is less than the capacity
         Assert(capacity_from_buffer_header() > 256, "the capacity should be more than 256");
@@ -427,7 +431,8 @@ struct malloc_core
      * @note Requires buffer capacity > 256 bytes
      * @note Subtracts current size, header size, and null termination from total capacity
      */
-    [[nodiscard, gnu::always_inline]] constexpr auto get_idle_capacity_from_buffer_header() const noexcept -> size_type {
+    [[nodiscard, gnu::always_inline]] constexpr auto get_idle_capacity_from_buffer_header() const noexcept
+      -> size_type {
         Assert(external.idle.flag > 1, "the flag should be 10 / 11");
         Assert(capacity_from_buffer_header() > 256, "the capacity should be more than 256");
         auto [cap, size] = get_capacity_and_size_from_buffer_header();
@@ -747,28 +752,29 @@ struct malloc_core
     }
 
     // Constructors and lifecycle management
-    
+
     /**
      * @brief Default constructor creating empty string state
      * @param unused Allocator parameter (ignored for malloc_core)
      * @note Initializes to empty string with internal storage
      */
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    constexpr malloc_core([[maybe_unused]] const std::allocator<Char>& unused = std::allocator<Char>{}) noexcept : body{0} { }
-    
+    constexpr malloc_core([[maybe_unused]] const std::allocator<Char>& unused = std::allocator<Char>{}) noexcept
+        : body{0} {}
+
     /// Copy constructor - copies entire storage state
     constexpr malloc_core(const malloc_core& other) noexcept : body(other.body) {}
-    
+
     /// Allocator-extended copy constructor (allocator ignored)
     constexpr malloc_core(const malloc_core& other, [[maybe_unused]] const std::allocator<Char>& unused) noexcept
         : body(other.body) {}
-        
+
     /// Move constructor - transfers ownership and resets source to empty
-    constexpr malloc_core(malloc_core&& gone) noexcept : body{std::exchange(gone.body, 0)} { }
+    constexpr malloc_core(malloc_core&& gone) noexcept : body{std::exchange(gone.body, 0)} {}
     ~malloc_core() = default;
     /// Copy assignment deleted - cores should not be reassigned after construction
     auto operator=(const malloc_core& other) -> malloc_core& = delete;
-    /// Move assignment deleted - cores should not be reassigned after construction  
+    /// Move assignment deleted - cores should not be reassigned after construction
     auto operator=(malloc_core&& other) noexcept -> malloc_core& = delete;
 };  // struct malloc_core
 
@@ -801,7 +807,7 @@ struct pmr_core : public malloc_core<Char, NullTerminated>
         // the buffer and the allocator_ptr belongs to same Arena or Object, so the swap both is OK
     }
     // PMR constructors and lifecycle management
-    
+
     /**
      * @brief Constructor with explicit PMR allocator
      * @param allocator The polymorphic allocator to use
@@ -850,24 +856,24 @@ class small_string_buffer
 {
    protected:
     /// Standard STL container type definitions for compatibility
-    using value_type = typename Traits::char_type;            ///< Character type from traits
-    using traits_type = Traits;                               ///< Character traits for operations
-    using allocator_type = Allocator;                         ///< Memory allocator type
-    using size_type = std::uint32_t;                          ///< Size/index type (32-bit for efficiency)
-    using difference_type = typename std::allocator_traits<Allocator>::difference_type; ///< Iterator difference type
+    using value_type = typename Traits::char_type;  ///< Character type from traits
+    using traits_type = Traits;                     ///< Character traits for operations
+    using allocator_type = Allocator;               ///< Memory allocator type
+    using size_type = std::uint32_t;                ///< Size/index type (32-bit for efficiency)
+    using difference_type = typename std::allocator_traits<Allocator>::difference_type;  ///< Iterator difference type
 
     /// Reference types for element access
-    using reference = typename std::allocator_traits<Allocator>::value_type&;       ///< Mutable reference
-    using const_reference = const typename std::allocator_traits<Allocator>::value_type&; ///< Immutable reference
-    using pointer = typename std::allocator_traits<Allocator>::pointer;             ///< Mutable pointer
-    using const_pointer = const typename std::allocator_traits<Allocator>::const_pointer; ///< Immutable pointer
+    using reference = typename std::allocator_traits<Allocator>::value_type&;              ///< Mutable reference
+    using const_reference = const typename std::allocator_traits<Allocator>::value_type&;  ///< Immutable reference
+    using pointer = typename std::allocator_traits<Allocator>::pointer;                    ///< Mutable pointer
+    using const_pointer = const typename std::allocator_traits<Allocator>::const_pointer;  ///< Immutable pointer
 
     /// Iterator types for STL compatibility
-    using iterator = Char*;                                   ///< Mutable iterator (raw pointer)
-    using const_iterator = const Char*;                       ///< Immutable iterator (raw pointer)
-    using reverse_iterator = std::reverse_iterator<iterator>; ///< Reverse mutable iterator
-    using const_reverse_iterator = std::reverse_iterator<const_iterator>; ///< Reverse immutable iterator
-    
+    using iterator = Char*;                                                ///< Mutable iterator (raw pointer)
+    using const_iterator = const Char*;                                    ///< Immutable iterator (raw pointer)
+    using reverse_iterator = std::reverse_iterator<iterator>;              ///< Reverse mutable iterator
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;  ///< Reverse immutable iterator
+
     /// Standard "not found" position marker (maximum size_type value)
     constexpr static size_t npos = std::numeric_limits<size_type>::max();
 
@@ -879,8 +885,8 @@ class small_string_buffer
      */
     enum class Need0 : bool
     {
-        Yes = true,   ///< Null termination required
-        No = false    ///< Null termination not needed
+        Yes = true,  ///< Null termination required
+        No = false   ///< Null termination not needed
     };
 
    private:
@@ -999,21 +1005,19 @@ class small_string_buffer
         }
         if (size <= core_type::max_short_buffer_size()) [[likely]] {
             if constexpr (NullTerminated) {
-                return {.buffer_size = static_cast<size_type>(AlignUpTo<8>(size + 1)),
-                        .core_type = CoreType::Short};
+                return {.buffer_size = static_cast<size_type>(AlignUpTo<8>(size + 1)), .core_type = CoreType::Short};
             } else {
                 return {.buffer_size = static_cast<size_type>(AlignUpTo<8>(size)), .core_type = CoreType::Short};
             }
         }
         if (size <= core_type::max_median_buffer_size()) [[likely]] {  // faster than 3-way compare
-            return {.buffer_size =
-                      static_cast<size_type>(AlignUpTo<8>(size + core_type::median_long_buffer_header_size())),
-                    .core_type = CoreType::Median};
+            return {
+              .buffer_size = static_cast<size_type>(AlignUpTo<8>(size + core_type::median_long_buffer_header_size())),
+              .core_type = CoreType::Median};
         }
         Assert(size <= core_type::max_long_buffer_size(),
                "the buffer size should be less than the max value of size_type");
-        return {.buffer_size =
-                  static_cast<size_type>(AlignUpTo<8>(size + core_type::median_long_buffer_header_size())),
+        return {.buffer_size = static_cast<size_type>(AlignUpTo<8>(size + core_type::median_long_buffer_header_size())),
                 .core_type = CoreType::Long};
     }
 
@@ -1266,11 +1270,11 @@ class small_string_buffer
 
    public:
     constexpr small_string_buffer([[maybe_unused]] const Allocator& allocator) noexcept : _core{allocator} {
-        #ifdef SMALL_STD_PMR_CHECK
+#ifdef SMALL_STD_PMR_CHECK
         if constexpr (not core_type::use_std_allocator::value) {
             Assert(check_the_allocator(), "the pmr default allocator is not allowed to be used in small_string");
         }
-        #endif
+#endif
     }
 
     constexpr small_string_buffer(const small_string_buffer& other) = delete;
@@ -1282,12 +1286,12 @@ class small_string_buffer
     // move constructor
     constexpr small_string_buffer(small_string_buffer&& other, [[maybe_unused]] const Allocator& /*unused*/) noexcept
         : _core(std::move(other._core)) {
-        #ifdef SMALL_STD_PMR_CHECK
+#ifdef SMALL_STD_PMR_CHECK
         Assert(
           check_the_allocator(),
           "the pmr default allocator is not allowed to be used in small_string");  // very important, check the
                                                                                    // allocator incorrect injected into.
-        #endif
+#endif
     }
 
     ~small_string_buffer() noexcept {
@@ -1373,7 +1377,7 @@ class small_string_buffer
  * @tparam Allocator Memory allocator type (default: std::allocator<Char>)
  * @tparam NullTerminated Whether strings maintain null termination (default: true)
  * @tparam Growth Growth factor for buffer reallocation (default: 1.5)
- * 
+ *
  * @note Uses small string optimization with 4 storage strategies:
  *       - Internal: up to 6-7 chars embedded directly in object
  *       - Short: up to 255 chars with compact metadata
@@ -1391,25 +1395,28 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
 {
    public:
     /// STL-compatible type definitions for template specialization and trait access
-    using buffer_type = Buffer<Char, Core, Traits, Allocator, NullTerminated, Growth>; ///< Underlying buffer management type
-    using value_type = typename Traits::char_type;            ///< Character type (same as Char)
-    using traits_type = Traits;                               ///< Character traits class
-    using allocator_type = Allocator;                         ///< Memory allocator type
-    using size_type = std::uint32_t;                          ///< Size/index type (32-bit for space efficiency)
-    using difference_type = typename std::allocator_traits<Allocator>::difference_type; ///< Signed difference type
+    using buffer_type =
+      Buffer<Char, Core, Traits, Allocator, NullTerminated, Growth>;  ///< Underlying buffer management type
+    using value_type = typename Traits::char_type;                    ///< Character type (same as Char)
+    using traits_type = Traits;                                       ///< Character traits class
+    using allocator_type = Allocator;                                 ///< Memory allocator type
+    using size_type = std::uint32_t;                                  ///< Size/index type (32-bit for space efficiency)
+    using difference_type = typename std::allocator_traits<Allocator>::difference_type;  ///< Signed difference type
 
     /// Reference and pointer types for STL compatibility
-    using reference = typename std::allocator_traits<Allocator>::value_type&;       ///< Mutable element reference
-    using const_reference = const typename std::allocator_traits<Allocator>::value_type&; ///< Immutable element reference
-    using pointer = typename std::allocator_traits<Allocator>::pointer;             ///< Mutable element pointer
-    using const_pointer = const typename std::allocator_traits<Allocator>::const_pointer; ///< Immutable element pointer
+    using reference = typename std::allocator_traits<Allocator>::value_type&;  ///< Mutable element reference
+    using const_reference =
+      const typename std::allocator_traits<Allocator>::value_type&;      ///< Immutable element reference
+    using pointer = typename std::allocator_traits<Allocator>::pointer;  ///< Mutable element pointer
+    using const_pointer =
+      const typename std::allocator_traits<Allocator>::const_pointer;  ///< Immutable element pointer
 
     /// Iterator types for STL algorithms and range-based for loops
-    using iterator = Char*;                                   ///< Mutable random access iterator
-    using const_iterator = const Char*;                       ///< Immutable random access iterator
-    using reverse_iterator = std::reverse_iterator<iterator>; ///< Mutable reverse iterator
-    using const_reverse_iterator = std::reverse_iterator<const_iterator>; ///< Immutable reverse iterator
-    
+    using iterator = Char*;                                                ///< Mutable random access iterator
+    using const_iterator = const Char*;                                    ///< Immutable random access iterator
+    using reverse_iterator = std::reverse_iterator<iterator>;              ///< Mutable reverse iterator
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;  ///< Immutable reverse iterator
+
     /// Standard "not found" sentinel value (maximum representable index)
     constexpr static size_type npos = std::numeric_limits<size_type>::max();
 
@@ -1456,8 +1463,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @return Uninitialized string with reserved capacity
      * @note Preferred over direct constructor for clarity
      */
-    static constexpr auto create_uninitialized_string(size_type new_string_size, const Allocator& allocator = Allocator())
-      -> basic_small_string {
+    static constexpr auto create_uninitialized_string(size_type new_string_size,
+                                                      const Allocator& allocator = Allocator()) -> basic_small_string {
         return basic_small_string(initialized_later{}, new_string_size, allocator);
     }
 
@@ -1565,7 +1572,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use
      * @note Does not require null termination, copies exactly count characters
      */
-    constexpr basic_small_string(const Char* s, size_type count, [[maybe_unused]] const Allocator& allocator = Allocator())
+    constexpr basic_small_string(const Char* s, size_type count,
+                                 [[maybe_unused]] const Allocator& allocator = Allocator())
         : basic_small_string(initialized_later{}, count, allocator) {
         std::memcpy(data(), s, count);
     }
@@ -2061,7 +2069,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @note May or may not be null-terminated depending on NullTerminated template parameter
      */
     [[nodiscard, gnu::always_inline]] auto data() const noexcept -> const Char* { return buffer_type::get_buffer(); }
-    
+
     /**
      * @brief Returns pointer to character data (mutable version)
      * @return Mutable pointer to character array
@@ -2839,7 +2847,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
 
         // else, the count != count2, need to move the right part
         // init a new string
-        basic_small_string ret{initialized_later{}, static_cast<size_type>(old_size - count + count2), buffer_type::get_allocator()};
+        basic_small_string ret{initialized_later{}, static_cast<size_type>(old_size - count + count2),
+                               buffer_type::get_allocator()};
         Char* p = ret.data();
         // copy the left party
         std::memcpy(p, data(), pos);
@@ -2887,7 +2896,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
         }
         // else, the count != count2, need to move the right part
         // init a new string
-        basic_small_string ret{initialized_later{}, static_cast<size_type>(old_size - count + count2), buffer_type::get_allocator()};
+        basic_small_string ret{initialized_later{}, static_cast<size_type>(old_size - count + count2),
+                               buffer_type::get_allocator()};
         Char* p = ret.data();
         // copy the left party
         std::memcpy(p, data(), pos);
@@ -2935,8 +2945,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @return Reference to this string after replacement
      * @note Uses substr to extract replacement substring
      */
-    auto replace(size_type pos, size_type count, const basic_small_string& other, size_type pos2, size_type count2 = npos)
-      -> basic_small_string& {
+    auto replace(size_type pos, size_type count, const basic_small_string& other, size_type pos2,
+                 size_type count2 = npos) -> basic_small_string& {
         if (count2 == npos) {
             count2 = other.size() - pos2;
         }
@@ -3040,7 +3050,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
 
         // else, the count != count2, need to move the right part
         // init a new string
-        basic_small_string ret{initialized_later{}, static_cast<size_type>(old_size - count + count2), buffer_type::get_allocator()};
+        basic_small_string ret{initialized_later{}, static_cast<size_type>(old_size - count + count2),
+                               buffer_type::get_allocator()};
         Char* p = ret.data();
         // copy the left party
         std::copy(cbegin(), first, ret.begin());
@@ -3587,7 +3598,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param pos Position to start the search from (searches backwards), defaults to end of string
      * @return Position of the last character not in other, or npos if not found
      */
-    [[nodiscard]] constexpr auto find_last_not_of(const basic_small_string& other, size_type pos = npos) const -> size_t {
+    [[nodiscard]] constexpr auto find_last_not_of(const basic_small_string& other, size_type pos = npos) const
+      -> size_t {
         return find_last_not_of(other.data(), pos, other.size());
     }
 
@@ -3647,8 +3659,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @return Negative value if substring1 < substring2, 0 if equal, positive if substring1 > substring2
      * @throws std::out_of_range if pos2 > other.size()
      */
-    [[nodiscard]] constexpr auto compare(size_type pos1, size_type count1, const basic_small_string& other, size_type pos2,
-                                         size_type count2 = npos) const -> int {
+    [[nodiscard]] constexpr auto compare(size_type pos1, size_type count1, const basic_small_string& other,
+                                         size_type pos2, size_type count2 = npos) const -> int {
         if (pos2 > other.size()) [[unlikely]] {
             throw std::out_of_range("compare: pos2 is out of range");
         }
@@ -3683,7 +3695,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @throws std::out_of_range if pos1 > size()
      * @note Handles overlapping ranges safely
      */
-    [[nodiscard]] constexpr auto compare(size_type pos1, size_type count1, const Char* str, size_type count2) const -> int {
+    [[nodiscard]] constexpr auto compare(size_type pos1, size_type count1, const Char* str, size_type count2) const
+      -> int {
         // make sure the pos1 is valid
         if (pos1 > size()) [[unlikely]] {
             throw std::out_of_range("compare: pos1 is out of range");
@@ -3822,7 +3835,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
             throw std::out_of_range("substr: pos is out of range");
         }
 
-        return basic_small_string{data() + pos, static_cast<size_type>(std::min<size_t>(count, current_size - pos)), get_allocator()};
+        return basic_small_string{data() + pos, static_cast<size_type>(std::min<size_t>(count, current_size - pos)),
+                                  get_allocator()};
     }
 
     /**
@@ -3870,15 +3884,15 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
  */
 /**
  * @brief Stream insertion operator for basic_small_string.
- * 
+ *
  * Inserts the contents of a basic_small_string into an output stream.
  * This operator allows basic_small_string objects to be used with standard
  * C++ output streams like std::cout.
- * 
+ *
  * @param os Output stream to write to
  * @param str String to be inserted into the stream
  * @return Reference to the output stream for chaining operations
- * 
+ *
  * @complexity Linear in the length of the string
  * @note This function directly writes the string data using stream.write(),
  *       which is more efficient than character-by-character insertion
@@ -3954,13 +3968,13 @@ inline auto operator>>(std::basic_istream<Char, Traits>& is,
 
 /**
  * @brief Concatenates two basic_small_string objects.
- * 
+ *
  * Creates a new string by concatenating the left-hand string with the right-hand string.
- * 
+ *
  * @param lhs Left-hand side string
  * @param rhs Right-hand side string
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the sum of the lengths of both strings
  */
 template <typename Char,
@@ -3976,13 +3990,13 @@ inline auto operator+(const basic_small_string<Char, Buffer, Core, Traits, Alloc
 
 /**
  * @brief Concatenates a basic_small_string with a C-style string.
- * 
+ *
  * Creates a new string by appending the null-terminated string rhs to lhs.
- * 
+ *
  * @param lhs Left-hand side string
  * @param rhs Right-hand side null-terminated string
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the sum of the lengths of both strings
  */
 template <typename Char,
@@ -3998,13 +4012,13 @@ inline auto operator+(const basic_small_string<Char, Buffer, Core, Traits, Alloc
 
 /**
  * @brief Concatenates a basic_small_string with a single character.
- * 
+ *
  * Creates a new string by appending the character rhs to lhs.
- * 
+ *
  * @param lhs Left-hand side string
  * @param rhs Right-hand side character
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the length of lhs, constant for appending the character
  */
 template <typename Char,
@@ -4019,13 +4033,13 @@ inline auto operator+(const basic_small_string<Char, Buffer, Core, Traits, Alloc
 
 /**
  * @brief Concatenates a C-style string with a basic_small_string.
- * 
+ *
  * Creates a new string by prepending the null-terminated string lhs to rhs.
- * 
+ *
  * @param lhs Left-hand side null-terminated string
  * @param rhs Right-hand side string
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the sum of the lengths of both strings
  */
 template <typename Char,
@@ -4039,13 +4053,13 @@ inline auto operator+(const Char* lhs,
 
 /**
  * @brief Concatenates a single character with a basic_small_string.
- * 
+ *
  * Creates a new string by prepending the character lhs to rhs.
- * 
+ *
  * @param lhs Left-hand side character
  * @param rhs Right-hand side string
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the length of rhs, constant for prepending the character
  */
 template <typename Char,
@@ -4059,13 +4073,13 @@ inline auto operator+(Char lhs,
 
 /**
  * @brief Concatenates two basic_small_string rvalue references.
- * 
+ *
  * Efficiently concatenates two temporary strings by moving from both operands.
- * 
+ *
  * @param lhs Left-hand side string (moved from)
- * @param rhs Right-hand side string (moved from)  
+ * @param rhs Right-hand side string (moved from)
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the sum of the lengths of both strings, but more efficient
  *             due to move semantics avoiding unnecessary copies
  */
@@ -4082,13 +4096,13 @@ inline auto operator+(basic_small_string<Char, Buffer, Core, Traits, Allocator, 
 
 /**
  * @brief Concatenates an rvalue basic_small_string with a const basic_small_string.
- * 
+ *
  * Efficiently concatenates by moving from the left operand and copying the right.
- * 
+ *
  * @param lhs Left-hand side string (moved from)
  * @param rhs Right-hand side string (copied)
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the sum of the lengths of both strings, optimized by
  *             moving from lhs to avoid one copy operation
  */
@@ -4105,13 +4119,13 @@ inline auto operator+(basic_small_string<Char, Buffer, Core, Traits, Allocator, 
 
 /**
  * @brief Concatenates an rvalue basic_small_string with a C-style string.
- * 
+ *
  * Efficiently concatenates by moving from the left operand and appending the string.
- * 
+ *
  * @param lhs Left-hand side string (moved from)
  * @param rhs Right-hand side null-terminated string
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the sum of the lengths of both strings, optimized by
  *             moving from lhs to avoid copying
  */
@@ -4128,13 +4142,13 @@ inline auto operator+(basic_small_string<Char, Buffer, Core, Traits, Allocator, 
 
 /**
  * @brief Concatenates an rvalue basic_small_string with a single character.
- * 
+ *
  * Efficiently concatenates by moving from the left operand and appending the character.
- * 
+ *
  * @param lhs Left-hand side string (moved from)
  * @param rhs Right-hand side character
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the length of lhs for the move, constant for appending the character
  */
 template <typename Char,
@@ -4149,13 +4163,13 @@ inline auto operator+(basic_small_string<Char, Buffer, Core, Traits, Allocator, 
 
 /**
  * @brief Concatenates a const basic_small_string with an rvalue basic_small_string.
- * 
+ *
  * Concatenates by copying the left operand and moving from the right.
- * 
+ *
  * @param lhs Left-hand side string (copied)
  * @param rhs Right-hand side string (moved from)
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the sum of the lengths of both strings, with move optimization
  *             for rhs reducing one copy operation
  */
@@ -4172,13 +4186,13 @@ inline auto operator+(const basic_small_string<Char, Buffer, Core, Traits, Alloc
 
 /**
  * @brief Concatenates a C-style string with an rvalue basic_small_string.
- * 
+ *
  * Creates a new string from the C-style string and concatenates with the moved string.
- * 
+ *
  * @param lhs Left-hand side null-terminated string
  * @param rhs Right-hand side string (moved from)
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the sum of the lengths of both strings, with move optimization
  *             for rhs reducing one copy operation
  */
@@ -4194,13 +4208,13 @@ inline auto operator+(const Char* lhs,
 
 /**
  * @brief Concatenates a single character with an rvalue basic_small_string.
- * 
+ *
  * Creates a new string from the character and concatenates with the moved string.
- * 
+ *
  * @param lhs Left-hand side character
  * @param rhs Right-hand side string (moved from)
  * @return A new string containing lhs followed by rhs
- * 
+ *
  * @complexity Linear in the length of rhs, with move optimization reducing one copy operation
  */
 template <typename Char,
@@ -4238,14 +4252,14 @@ inline auto operator<=>(
 
 /**
  * @brief Tests two basic_small_string objects for equality.
- * 
+ *
  * Compares two strings for equality by first checking their sizes and then
  * comparing their contents character by character.
- * 
+ *
  * @param lhs Left-hand side string
  * @param rhs Right-hand side string
  * @return true if both strings have the same size and content, false otherwise
- * 
+ *
  * @complexity Linear in the length of the strings in the worst case, but optimized
  *             with early size check that runs in constant time
  * @note This function is noexcept and will not throw any exceptions
@@ -4261,13 +4275,13 @@ inline auto operator==(
 
 /**
  * @brief Tests two basic_small_string objects for inequality.
- * 
+ *
  * Compares two strings for inequality. This is the logical negation of operator==.
- * 
+ *
  * @param lhs Left-hand side string
  * @param rhs Right-hand side string
  * @return true if the strings differ in size or content, false if they are equal
- * 
+ *
  * @complexity Same as operator==: Linear in the length of the strings in the worst case,
  *             with constant time size check optimization
  * @note This function is noexcept and will not throw any exceptions
@@ -4288,13 +4302,13 @@ inline auto operator!=(
 
 /**
  * @brief Tests if left string is lexicographically greater than right string.
- * 
+ *
  * Performs lexicographical comparison using the compare() method.
- * 
+ *
  * @param lhs Left-hand side string
  * @param rhs Right-hand side string
  * @return true if lhs is lexicographically greater than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and uses lexicographical ordering based on character traits
  */
@@ -4309,13 +4323,13 @@ inline auto operator>(
 
 /**
  * @brief Tests if left string is lexicographically less than right string.
- * 
+ *
  * Performs lexicographical comparison using the compare() method.
- * 
+ *
  * @param lhs Left-hand side string
  * @param rhs Right-hand side string
  * @return true if lhs is lexicographically less than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and uses lexicographical ordering based on character traits
  */
@@ -4330,13 +4344,13 @@ inline auto operator<(
 
 /**
  * @brief Tests if left string is lexicographically greater than or equal to right string.
- * 
+ *
  * Performs lexicographical comparison by negating the less-than operator.
- * 
+ *
  * @param lhs Left-hand side string
  * @param rhs Right-hand side string
  * @return true if lhs is lexicographically greater than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator<: Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and is implemented as the logical negation of operator<
  */
@@ -4351,13 +4365,13 @@ inline auto operator>=(
 
 /**
  * @brief Tests if left string is lexicographically less than or equal to right string.
- * 
+ *
  * Performs lexicographical comparison by negating the greater-than operator.
- * 
+ *
  * @param lhs Left-hand side string
  * @param rhs Right-hand side string
  * @return true if lhs is lexicographically less than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator>: Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and is implemented as the logical negation of operator>
  */
@@ -4378,7 +4392,7 @@ inline auto operator<=(
 /**
  * @brief Three-way comparison operator between basic_small_string and std::basic_string
  * @param lhs Left-hand side basic_small_string
- * @param rhs Right-hand side std::basic_string  
+ * @param rhs Right-hand side std::basic_string
  * @return std::strong_ordering result of lexicographical comparison
  * @note Uses compare() method for efficient string comparison
  * @complexity Linear in the length of the shorter string
@@ -4484,13 +4498,13 @@ inline auto operator<=>(
 
 /**
  * @brief Tests a basic_small_string and std::basic_string for equality.
- * 
+ *
  * Compares a basic_small_string with a std::basic_string for equality.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::basic_string
  * @return true if both strings have the same size and content, false otherwise
- * 
+ *
  * @complexity Linear in the length of the strings in the worst case, with constant time size check
  * @note This function is noexcept and provides interoperability with std::basic_string
  */
@@ -4505,13 +4519,13 @@ inline auto operator==(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests a std::basic_string and basic_small_string for equality.
- * 
+ *
  * Compares a std::basic_string with a basic_small_string for equality.
- * 
+ *
  * @param lhs Left-hand side std::basic_string
  * @param rhs Right-hand side basic_small_string
  * @return true if both strings have the same size and content, false otherwise
- * 
+ *
  * @complexity Linear in the length of the strings in the worst case, with constant time size check
  * @note This function is noexcept and provides interoperability with std::basic_string
  */
@@ -4527,13 +4541,13 @@ inline auto operator==(
 
 /**
  * @brief Tests a C-style string and basic_small_string for equality.
- * 
+ *
  * Compares a null-terminated C-style string with a basic_small_string for equality.
- * 
+ *
  * @param lhs Left-hand side null-terminated string
  * @param rhs Right-hand side basic_small_string
  * @return true if the strings have the same length and content, false otherwise
- * 
+ *
  * @complexity Linear in the length of the strings (requires computing C-string length)
  * @note This function is noexcept and provides interoperability with C-style strings
  */
@@ -4548,13 +4562,13 @@ inline auto operator==(
 
 /**
  * @brief Tests a basic_small_string and C-style string for equality.
- * 
+ *
  * Compares a basic_small_string with a null-terminated C-style string for equality.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side null-terminated string
  * @return true if the strings have the same length and content, false otherwise
- * 
+ *
  * @complexity Linear in the length of the strings (requires computing C-string length)
  * @note This function is noexcept and provides interoperability with C-style strings
  */
@@ -4568,13 +4582,13 @@ inline auto operator==(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests a basic_small_string and std::string_view for equality.
- * 
+ *
  * Compares a basic_small_string with a std::string_view for equality.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::string_view
  * @return true if both strings have the same size and content, false otherwise
- * 
+ *
  * @complexity Linear in the length of the strings in the worst case, with constant time size check
  * @note This function is noexcept and provides interoperability with std::string_view
  */
@@ -4588,13 +4602,13 @@ inline auto operator==(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests a std::string_view and basic_small_string for equality.
- * 
+ *
  * Compares a std::string_view with a basic_small_string for equality.
- * 
+ *
  * @param lhs Left-hand side std::string_view
  * @param rhs Right-hand side basic_small_string
  * @return true if both strings have the same size and content, false otherwise
- * 
+ *
  * @complexity Linear in the length of the strings in the worst case, with constant time size check
  * @note This function is noexcept and provides interoperability with std::string_view
  */
@@ -4609,14 +4623,14 @@ inline auto operator==(
 
 /**
  * @brief Tests a basic_small_string and std::basic_string for inequality.
- * 
+ *
  * Compares a basic_small_string with a std::basic_string for inequality.
  * This is the logical negation of the corresponding operator==.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::basic_string
  * @return true if the strings differ in size or content, false if they are equal
- * 
+ *
  * @complexity Same as operator==: Linear in the length of strings, with size check optimization
  * @note This function is noexcept and provides interoperability with std::basic_string
  */
@@ -4631,14 +4645,14 @@ inline auto operator!=(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests a std::basic_string and basic_small_string for inequality.
- * 
+ *
  * Compares a std::basic_string with a basic_small_string for inequality.
  * This is the logical negation of the corresponding operator==.
- * 
+ *
  * @param lhs Left-hand side std::basic_string
  * @param rhs Right-hand side basic_small_string
  * @return true if the strings differ in size or content, false if they are equal
- * 
+ *
  * @complexity Same as operator==: Linear in the length of strings, with size check optimization
  * @note This function is noexcept and provides interoperability with std::basic_string
  */
@@ -4654,14 +4668,14 @@ inline auto operator!=(
 
 /**
  * @brief Tests a basic_small_string and C-style string for inequality.
- * 
+ *
  * Compares a basic_small_string with a null-terminated C-style string for inequality.
  * This is the logical negation of the corresponding operator==.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side null-terminated string
  * @return true if the strings differ in length or content, false if they are equal
- * 
+ *
  * @complexity Same as operator==: Linear in the length of strings (requires C-string length computation)
  * @note This function is noexcept and provides interoperability with C-style strings
  */
@@ -4675,14 +4689,14 @@ inline auto operator!=(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests a C-style string and basic_small_string for inequality.
- * 
+ *
  * Compares a null-terminated C-style string with a basic_small_string for inequality.
  * This is the logical negation of the corresponding operator==.
- * 
+ *
  * @param lhs Left-hand side null-terminated string
  * @param rhs Right-hand side basic_small_string
  * @return true if the strings differ in length or content, false if they are equal
- * 
+ *
  * @complexity Same as operator==: Linear in the length of strings (requires C-string length computation)
  * @note This function is noexcept and provides interoperability with C-style strings
  */
@@ -4697,14 +4711,14 @@ inline auto operator!=(
 
 /**
  * @brief Tests a basic_small_string and std::string_view for inequality.
- * 
+ *
  * Compares a basic_small_string with a std::string_view for inequality.
  * This is the logical negation of the corresponding operator==.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::string_view
  * @return true if the strings differ in size or content, false if they are equal
- * 
+ *
  * @complexity Same as operator==: Linear in the length of strings, with size check optimization
  * @note This function is noexcept and provides interoperability with std::string_view
  */
@@ -4718,14 +4732,14 @@ inline auto operator!=(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests a std::string_view and basic_small_string for inequality.
- * 
+ *
  * Compares a std::string_view with a basic_small_string for inequality.
  * This is the logical negation of the corresponding operator==.
- * 
+ *
  * @param lhs Left-hand side std::string_view
  * @param rhs Right-hand side basic_small_string
  * @return true if the strings differ in size or content, false if they are equal
- * 
+ *
  * @complexity Same as operator==: Linear in the length of strings, with size check optimization
  * @note This function is noexcept and provides interoperability with std::string_view
  */
@@ -4740,13 +4754,13 @@ inline auto operator!=(
 
 /**
  * @brief Tests if a basic_small_string is lexicographically less than a std::basic_string.
- * 
+ *
  * Performs lexicographical comparison using the compare() method.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::basic_string
  * @return true if lhs is lexicographically less than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and provides interoperability with std::basic_string
  */
@@ -4761,13 +4775,13 @@ inline auto operator<(const basic_small_string<Char, Buffer, Core, Traits, Alloc
 
 /**
  * @brief Tests if a std::basic_string is lexicographically less than a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison using the basic_small_string's compare() method.
- * 
+ *
  * @param lhs Left-hand side std::basic_string
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically less than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and provides interoperability with std::basic_string
  */
@@ -4783,13 +4797,13 @@ inline auto operator<(
 
 /**
  * @brief Tests if a basic_small_string is lexicographically less than a C-style string.
- * 
+ *
  * Performs lexicographical comparison using the compare() method.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side null-terminated string
  * @return true if lhs is lexicographically less than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string (requires computing C-string length)
  * @note This function is noexcept and provides interoperability with C-style strings
  */
@@ -4803,13 +4817,13 @@ inline auto operator<(const basic_small_string<Char, Buffer, Core, Traits, Alloc
 
 /**
  * @brief Tests if a C-style string is lexicographically less than a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison using the basic_small_string's compare() method.
- * 
+ *
  * @param lhs Left-hand side null-terminated string
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically less than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string (requires computing C-string length)
  * @note This function is noexcept and provides interoperability with C-style strings
  */
@@ -4824,13 +4838,13 @@ inline auto operator<(
 
 /**
  * @brief Tests if a basic_small_string is lexicographically less than a std::string_view.
- * 
+ *
  * Performs lexicographical comparison using the compare() method.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::string_view
  * @return true if lhs is lexicographically less than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and provides interoperability with std::string_view
  */
@@ -4844,13 +4858,13 @@ inline auto operator<(const basic_small_string<Char, Buffer, Core, Traits, Alloc
 
 /**
  * @brief Tests if a std::string_view is lexicographically less than a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison using the basic_small_string's compare() method.
- * 
+ *
  * @param lhs Left-hand side std::string_view
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically less than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and provides interoperability with std::string_view
  */
@@ -4865,13 +4879,13 @@ inline auto operator<(
 
 /**
  * @brief Tests if a std::basic_string is lexicographically greater than a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison using the basic_small_string's compare() method.
- * 
+ *
  * @param lhs Left-hand side std::basic_string
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically greater than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and provides interoperability with std::basic_string
  */
@@ -4887,13 +4901,13 @@ inline auto operator>(
 
 /**
  * @brief Tests if a C-style string is lexicographically greater than a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison using the basic_small_string's compare() method.
- * 
+ *
  * @param lhs Left-hand side null-terminated string
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically greater than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string (requires computing C-string length)
  * @note This function is noexcept and provides interoperability with C-style strings
  */
@@ -4908,13 +4922,13 @@ inline auto operator>(
 
 /**
  * @brief Tests if a basic_small_string is lexicographically greater than a C-style string.
- * 
+ *
  * Performs lexicographical comparison using the compare() method.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side null-terminated string
  * @return true if lhs is lexicographically greater than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string (requires computing C-string length)
  * @note This function is noexcept and provides interoperability with C-style strings
  */
@@ -4928,13 +4942,13 @@ inline auto operator>(const basic_small_string<Char, Buffer, Core, Traits, Alloc
 
 /**
  * @brief Tests if a basic_small_string is lexicographically greater than a std::string_view.
- * 
+ *
  * Performs lexicographical comparison using the compare() method.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::string_view
  * @return true if lhs is lexicographically greater than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and provides interoperability with std::string_view
  */
@@ -4948,13 +4962,13 @@ inline auto operator>(const basic_small_string<Char, Buffer, Core, Traits, Alloc
 
 /**
  * @brief Tests if a std::string_view is lexicographically greater than a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison using the basic_small_string's compare() method.
- * 
+ *
  * @param lhs Left-hand side std::string_view
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically greater than rhs, false otherwise
- * 
+ *
  * @complexity Linear in the length of the shorter string in the worst case
  * @note This function is noexcept and provides interoperability with std::string_view
  */
@@ -4969,15 +4983,16 @@ inline auto operator>(
 
 /**
  * @brief Tests if a basic_small_string is lexicographically less than or equal to a std::basic_string.
- * 
+ *
  * Performs lexicographical comparison by negating the greater-than operator.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::basic_string
  * @return true if lhs is lexicographically less than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator>: Linear in the length of the shorter string in the worst case
- * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with std::basic_string
+ * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with
+ * std::basic_string
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -4990,15 +5005,16 @@ inline auto operator<=(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests if a std::basic_string is lexicographically less than or equal to a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison by negating the greater-than operator.
- * 
+ *
  * @param lhs Left-hand side std::basic_string
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically less than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator>: Linear in the length of the shorter string in the worst case
- * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with std::basic_string
+ * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with
+ * std::basic_string
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5012,15 +5028,16 @@ inline auto operator<=(
 
 /**
  * @brief Tests if a basic_small_string is lexicographically less than or equal to a C-style string.
- * 
+ *
  * Performs lexicographical comparison by negating the greater-than operator.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side null-terminated string
  * @return true if lhs is lexicographically less than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator>: Linear in the length of the shorter string (requires computing C-string length)
- * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with C-style strings
+ * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with
+ * C-style strings
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5032,15 +5049,16 @@ inline auto operator<=(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests if a C-style string is lexicographically less than or equal to a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison by negating the greater-than operator.
- * 
+ *
  * @param lhs Left-hand side null-terminated string
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically less than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator>: Linear in the length of the shorter string (requires computing C-string length)
- * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with C-style strings
+ * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with
+ * C-style strings
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5053,15 +5071,16 @@ inline auto operator<=(
 
 /**
  * @brief Tests if a basic_small_string is lexicographically less than or equal to a std::string_view.
- * 
+ *
  * Performs lexicographical comparison by negating the greater-than operator.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::string_view
  * @return true if lhs is lexicographically less than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator>: Linear in the length of the shorter string in the worst case
- * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with std::string_view
+ * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with
+ * std::string_view
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5073,15 +5092,16 @@ inline auto operator<=(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests if a std::string_view is lexicographically less than or equal to a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison by negating the greater-than operator.
- * 
+ *
  * @param lhs Left-hand side std::string_view
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically less than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator>: Linear in the length of the shorter string in the worst case
- * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with std::string_view
+ * @note This function is noexcept, implemented as logical negation of operator>, and provides interoperability with
+ * std::string_view
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5094,15 +5114,16 @@ inline auto operator<=(
 
 /**
  * @brief Tests if a basic_small_string is lexicographically greater than or equal to a std::basic_string.
- * 
+ *
  * Performs lexicographical comparison by negating the less-than operator.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::basic_string
  * @return true if lhs is lexicographically greater than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator<: Linear in the length of the shorter string in the worst case
- * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with std::basic_string
+ * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with
+ * std::basic_string
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5115,15 +5136,16 @@ inline auto operator>=(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests if a std::basic_string is lexicographically greater than or equal to a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison by negating the less-than operator.
- * 
+ *
  * @param lhs Left-hand side std::basic_string
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically greater than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator<: Linear in the length of the shorter string in the worst case
- * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with std::basic_string
+ * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with
+ * std::basic_string
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5137,15 +5159,16 @@ inline auto operator>=(
 
 /**
  * @brief Tests if a basic_small_string is lexicographically greater than or equal to a C-style string.
- * 
+ *
  * Performs lexicographical comparison by negating the less-than operator.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side null-terminated string
  * @return true if lhs is lexicographically greater than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator<: Linear in the length of the shorter string (requires computing C-string length)
- * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with C-style strings
+ * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with
+ * C-style strings
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5157,15 +5180,16 @@ inline auto operator>=(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests if a C-style string is lexicographically greater than or equal to a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison by negating the less-than operator.
- * 
+ *
  * @param lhs Left-hand side null-terminated string
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically greater than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator<: Linear in the length of the shorter string (requires computing C-string length)
- * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with C-style strings
+ * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with
+ * C-style strings
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5178,15 +5202,16 @@ inline auto operator>=(
 
 /**
  * @brief Tests if a basic_small_string is lexicographically greater than or equal to a std::string_view.
- * 
+ *
  * Performs lexicographical comparison by negating the less-than operator.
- * 
+ *
  * @param lhs Left-hand side basic_small_string
  * @param rhs Right-hand side std::string_view
  * @return true if lhs is lexicographically greater than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator<: Linear in the length of the shorter string in the worst case
- * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with std::string_view
+ * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with
+ * std::string_view
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5198,15 +5223,16 @@ inline auto operator>=(const basic_small_string<Char, Buffer, Core, Traits, Allo
 
 /**
  * @brief Tests if a std::string_view is lexicographically greater than or equal to a basic_small_string.
- * 
+ *
  * Performs lexicographical comparison by negating the less-than operator.
- * 
+ *
  * @param lhs Left-hand side std::string_view
  * @param rhs Right-hand side basic_small_string
  * @return true if lhs is lexicographically greater than or equal to rhs, false otherwise
- * 
+ *
  * @complexity Same as operator<: Linear in the length of the shorter string in the worst case
- * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with std::string_view
+ * @note This function is noexcept, implemented as logical negation of operator<, and provides interoperability with
+ * std::string_view
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
@@ -5226,15 +5252,15 @@ static_assert(sizeof(small_byte_string) == 8, "small_byte_string should be same 
 
 /**
  * @brief Converts a value to a small string using std::format.
- * 
+ *
  * This function template provides a generic way to convert any formattable value
  * to a small string type using C++20's std::format functionality.
- * 
+ *
  * @tparam String The target small string type to create
  * @tparam T The type of value to convert (must be formattable)
  * @param value The value to convert to string
  * @return A String object containing the formatted representation of value
- * 
+ *
  * @complexity Linear in the formatted size of the value
  * @note Requires C++20 std::format support
  * @note Uses std::formatted_size for efficient memory allocation
@@ -5249,13 +5275,13 @@ auto to_small_string(T value) -> String {
 
 /**
  * @brief Converts a C-style string to a small string.
- * 
+ *
  * Creates a small string from a null-terminated C-style string.
- * 
+ *
  * @tparam String The target small string type to create
  * @param value Null-terminated C-style string to convert
  * @return A String object containing a copy of the C-style string
- * 
+ *
  * @complexity Linear in the length of the C-style string
  * @note The input string must be null-terminated
  */
@@ -5266,13 +5292,13 @@ auto to_small_string(const char* value) -> String {
 
 /**
  * @brief Converts a std::string to a small string.
- * 
+ *
  * Creates a small string from a std::string, copying its contents.
- * 
+ *
  * @tparam String The target small string type to create
  * @param value The std::string to convert
  * @return A String object containing a copy of the std::string's contents
- * 
+ *
  * @complexity Linear in the length of the std::string
  * @note Provides interoperability between std::string and small string types
  */
@@ -5283,13 +5309,13 @@ auto to_small_string(const std::string& value) -> String {
 
 /**
  * @brief Converts a std::string_view to a small string.
- * 
+ *
  * Creates a small string from a std::string_view, copying the viewed data.
- * 
- * @tparam String The target small string type to create  
+ *
+ * @tparam String The target small string type to create
  * @param view The std::string_view to convert
  * @return A String object containing a copy of the string_view's data
- * 
+ *
  * @complexity Linear in the length of the string_view
  * @note Provides efficient conversion from string views to small strings
  * @note The resulting string owns its data independently of the original view
@@ -5333,17 +5359,17 @@ static_assert(sizeof(small_string) == 16, "small_string should be same as a poin
 
 /**
  * @brief Converts a value to a PMR small string using std::format.
- * 
+ *
  * This function template provides a generic way to convert any formattable value
  * to a PMR-based small string type using C++20's std::format functionality and
  * a custom polymorphic allocator.
- * 
+ *
  * @tparam String The target PMR small string type to create
  * @tparam T The type of value to convert (must be formattable)
  * @param value The value to convert to string
  * @param allocator The polymorphic allocator to use for memory allocation
  * @return A String object containing the formatted representation of value
- * 
+ *
  * @complexity Linear in the formatted size of the value
  * @note Requires C++20 std::format support and C++17 PMR
  * @note Uses std::formatted_size for efficient memory allocation
@@ -5359,15 +5385,15 @@ auto to_small_string(T value, std::pmr::polymorphic_allocator<char> allocator) -
 
 /**
  * @brief Converts a C-style string to a PMR small string.
- * 
+ *
  * Creates a PMR-based small string from a null-terminated C-style string
  * using the specified polymorphic allocator.
- * 
+ *
  * @tparam String The target PMR small string type to create
  * @param value Null-terminated C-style string to convert
  * @param allocator The polymorphic allocator to use for memory allocation
  * @return A String object containing a copy of the C-style string
- * 
+ *
  * @complexity Linear in the length of the C-style string
  * @note The input string must be null-terminated
  * @note Memory is allocated using the provided polymorphic allocator
@@ -5379,15 +5405,15 @@ auto to_small_string(const char* value, std::pmr::polymorphic_allocator<char> al
 
 /**
  * @brief Converts a std::string to a PMR small string.
- * 
+ *
  * Creates a PMR-based small string from a std::string using the specified
  * polymorphic allocator, copying the string's contents.
- * 
+ *
  * @tparam String The target PMR small string type to create
  * @param value The std::string to convert
  * @param allocator The polymorphic allocator to use for memory allocation
  * @return A String object containing a copy of the std::string's contents
- * 
+ *
  * @complexity Linear in the length of the std::string
  * @note Provides interoperability between std::string and PMR small string types
  * @note Memory is allocated using the provided polymorphic allocator
@@ -5399,15 +5425,15 @@ auto to_small_string(const std::string& value, std::pmr::polymorphic_allocator<c
 
 /**
  * @brief Converts a std::string_view to a PMR small string.
- * 
+ *
  * Creates a PMR-based small string from a std::string_view using the specified
  * polymorphic allocator, copying the viewed data.
- * 
+ *
  * @tparam String The target PMR small string type to create
  * @param view The std::string_view to convert
  * @param allocator The polymorphic allocator to use for memory allocation
  * @return A String object containing a copy of the string_view's data
- * 
+ *
  * @complexity Linear in the length of the string_view
  * @note Provides efficient conversion from string views to PMR small strings
  * @note The resulting string owns its data independently of the original view
@@ -5435,8 +5461,8 @@ struct hash<small::basic_small_string<Char, Buffer, Core, Traits, Allocator, Nul
 {
     /// Type aliases for hash functor compatibility
     using argument_type =
-      small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated, Growth>; ///< Input string type
-    using result_type = std::size_t;  ///< Hash result type
+      small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated, Growth>;  ///< Input string type
+    using result_type = std::size_t;                                                             ///< Hash result type
 
     auto operator()(const argument_type& str) const noexcept -> result_type {
         return std::hash<std::basic_string_view<Char, Traits>>{}(str);

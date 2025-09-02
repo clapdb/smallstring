@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2020 Beijing Jinyi Data Technology Co., Ltd.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-#include "string/string.hpp"
-
 #include <cxxabi.h>     // for __forced_unwind
 #include <sys/types.h>  // for uint
 
@@ -33,13 +16,11 @@
 #include <random>   // for mt19937, uniform_int_distribution
 #include <sstream>  // for operator<<, basic_istream, basic_string...
 #include <thread>
-#include <type_traits>  // for is_same
 #include <vector>       // for vector
 
-#include "arena/arena.hpp"    // for size_t, Arena, Arena::Options
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"  // for binary_assert, CHECK_EQ, TestCase, CHECK
-#include "string/arena_string.hpp"
-#include "string/small_string.hpp"
+#include "include/smallstring.hpp"
 
 namespace small {
 
@@ -48,6 +29,7 @@ using RandomT = std::mt19937;
 static RandomT rng(seed);
 static const size_t maxString = 100;
 static const bool avoidAliasing = true;
+using string = small_string;
 
 template <class Integral1, class Integral2>
 auto random(Integral1 low, Integral2 up) -> Integral2 {
@@ -331,9 +313,7 @@ void clause11_21_4_2_k(String& test) {
         s[i] = random(int8_t('a'), int8_t('z'));
     }
     test = std::move(s);
-    if (std::is_same<String, string>::value) {
-        CHECK_LE(s.size(), 128);  // NOLINT
-    }
+    CHECK_LE(s.size(), 128);  // NOLINT
 }
 
 template <class String>
@@ -347,9 +327,7 @@ void arena_clause11_21_4_2_k(String& test) {
         s[i] = (char)random(int8_t('a'), int8_t('z'));
     }
     test = std::move(s);
-    if (std::is_same<String, string>::value) {
-        CHECK_LE(s.size(), 128);  // NOLINT
-    }
+    CHECK_LE(s.size(), 128);  // NOLINT
 }
 
 template <class String>
@@ -708,9 +686,7 @@ void clause11_21_4_6_3_a(String& test) {
     CHECK_EQ(test, s);
     // move assign
     test.assign(std::move(s));
-    if (std::is_same<String, string>::value) {
-        CHECK_LE(s.size(), 128);  // NOLINT
-    }
+    CHECK_LE(s.size(), 128);  // NOLINT
 }
 
 template <class String>
@@ -722,9 +698,7 @@ void arena_clause11_21_4_6_3_a(String& test) {
     CHECK_EQ(test, s);
     // move assign
     test.assign(std::move(s));
-    if (std::is_same<String, string>::value) {
-        CHECK_LE(s.size(), 128);  // NOLINT
-    }
+    CHECK_LE(s.size(), 128);  // NOLINT
 }
 
 template <class String>
@@ -1974,283 +1948,12 @@ void arena_clause11_21_4_8_9_a(String& test) {
     }
 }
 
-TEST_CASE("c++20 string starts_with") {
-    SUBCASE("starts_with_char") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.starts_with('h'), true);
-        CHECK_EQ(x.starts_with('x'), false);
-
-        stdb::memory::string y;
-        CHECK_EQ(y.starts_with('h'), false);
-    }
-    SUBCASE("starts_with_cstr") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.starts_with("hello"), true);
-        CHECK_EQ(x.starts_with("ello"), false);
-        CHECK_EQ(x.starts_with("helloworld"), true);
-        CHECK_EQ(x.starts_with("helloworld "), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.starts_with("helloworld"), false);
-        CHECK_EQ(y.starts_with("ello"), false);
-    }
-    SUBCASE("starts_with_string_view") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.starts_with(std::string_view("hello")), true);
-        CHECK_EQ(x.starts_with(std::string_view("ello")), false);
-        CHECK_EQ(x.starts_with(std::string_view("helloworld")), true);
-        CHECK_EQ(x.starts_with(std::string_view("helloworld ")), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.starts_with(std::string_view("helloworld")), false);
-        CHECK_EQ(y.starts_with(std::string_view("ello")), false);
-    }
-    SUBCASE("starts_with_string") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.starts_with(stdb::memory::string("hello")), true);
-        CHECK_EQ(x.starts_with(stdb::memory::string("ello")), false);
-        CHECK_EQ(x.starts_with(stdb::memory::string("helloworld")), true);
-        CHECK_EQ(x.starts_with(stdb::memory::string("helloworld ")), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.starts_with(stdb::memory::string("helloworld")), false);
-        CHECK_EQ(y.starts_with(stdb::memory::string("ello")), false);
-    }
-}
-
-TEST_CASE("c++20 arena_string starts_with") {
-    Arena arena(Arena::Options::GetDefaultOptions());
-    SUBCASE("starts_with_char") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.starts_with('h'), true);
-        CHECK_EQ(x.starts_with('x'), false);
-
-        stdb::memory::arena_string y(arena.get_memory_resource());
-        CHECK_EQ(y.starts_with('h'), false);
-        CHECK_EQ(y.starts_with(' '), false);
-    }
-    SUBCASE("starts_with_cstr") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.starts_with("hello"), true);
-        CHECK_EQ(x.starts_with("ello"), false);
-        CHECK_EQ(x.starts_with("helloworld"), true);
-        CHECK_EQ(x.starts_with("helloworld "), false);
-        stdb::memory::arena_string y(arena.get_memory_resource());
-        CHECK_EQ(y.starts_with("helloworld"), false);
-        CHECK_EQ(y.starts_with("ello"), false);
-        CHECK_EQ(y.starts_with(""), true);
-    }
-    SUBCASE("starts_with_string_view") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.starts_with(std::string_view("hello")), true);
-        CHECK_EQ(x.starts_with(std::string_view("ello")), false);
-        CHECK_EQ(x.starts_with(std::string_view("helloworld")), true);
-        CHECK_EQ(x.starts_with(std::string_view("helloworld ")), false);
-        stdb::memory::arena_string y(arena.get_memory_resource());
-        CHECK_EQ(y.starts_with(std::string_view("helloworld")), false);
-        CHECK_EQ(y.starts_with(std::string_view("ello")), false);
-        CHECK_EQ(y.starts_with(std::string_view("")), true);
-    }
-    SUBCASE("starts_with_string") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.starts_with(stdb::memory::string("hello")), true);
-        CHECK_EQ(x.starts_with(stdb::memory::string("ello")), false);
-        CHECK_EQ(x.starts_with(stdb::memory::string("helloworld")), true);
-        CHECK_EQ(x.starts_with(stdb::memory::string("helloworld ")), false);
-        stdb::memory::arena_string y(arena.get_memory_resource());
-        CHECK_EQ(y.starts_with(stdb::memory::string("helloworld")), false);
-        CHECK_EQ(y.starts_with(stdb::memory::string("ello")), false);
-        CHECK_EQ(y.starts_with(stdb::memory::string("")), true);
-    }
-}
-
-TEST_CASE("c++20 string ends_with") {
-    SUBCASE("ends_with_char") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.ends_with('d'), true);
-        CHECK_EQ(x.ends_with('x'), false);
-
-        stdb::memory::string y;
-        CHECK_EQ(y.ends_with('h'), false);
-        CHECK_EQ(y.ends_with(' '), false);
-    }
-    SUBCASE("ends_with_cstr") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.ends_with("world"), true);
-        CHECK_EQ(x.ends_with("llo"), false);
-        CHECK_EQ(x.ends_with("helloworld"), true);
-        CHECK_EQ(x.ends_with(" helloworld"), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.ends_with("helloworld"), false);
-        CHECK_EQ(y.ends_with("ello"), false);
-        CHECK_EQ(y.ends_with(""), true);
-    }
-    SUBCASE("ends_with_string_view") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.ends_with(std::string_view("world")), true);
-        CHECK_EQ(x.ends_with(std::string_view("hello")), false);
-        CHECK_EQ(x.ends_with(std::string_view("helloworld")), true);
-        CHECK_EQ(x.ends_with(std::string_view(" helloworld")), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.ends_with(std::string_view("helloworld")), false);
-        CHECK_EQ(y.ends_with(std::string_view("ello")), false);
-        CHECK_EQ(y.ends_with(std::string_view("")), true);
-    }
-    SUBCASE("ends_with_string") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.ends_with(stdb::memory::string("world")), true);
-        CHECK_EQ(x.ends_with(stdb::memory::string("ello")), false);
-        CHECK_EQ(x.ends_with(stdb::memory::string("helloworld")), true);
-        CHECK_EQ(x.ends_with(stdb::memory::string(" helloworld")), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.ends_with(stdb::memory::string("helloworld")), false);
-        CHECK_EQ(y.ends_with(stdb::memory::string("ello")), false);
-        CHECK_EQ(y.ends_with(stdb::memory::string("")), true);
-    }
-}
-
-TEST_CASE("c++20 arena_string ends_with") {
-    Arena arena(Arena::Options::GetDefaultOptions());
-    SUBCASE("ends_with_char") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.ends_with('d'), true);
-        CHECK_EQ(x.ends_with('x'), false);
-
-        stdb::memory::string y;
-        CHECK_EQ(y.ends_with('h'), false);
-    }
-    SUBCASE("ends_with_cstr") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.ends_with("world"), true);
-        CHECK_EQ(x.ends_with("ello"), false);
-        CHECK_EQ(x.ends_with("helloworld"), true);
-        CHECK_EQ(x.ends_with(" helloworld"), false);
-        stdb::memory::arena_string y(arena.get_memory_resource());
-        CHECK_EQ(y.ends_with("helloworld"), false);
-        CHECK_EQ(y.ends_with("ello"), false);
-    }
-    SUBCASE("ends_with_string_view") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.ends_with(std::string_view("world")), true);
-        CHECK_EQ(x.ends_with(std::string_view("ello")), false);
-        CHECK_EQ(x.ends_with(std::string_view("helloworld")), true);
-        CHECK_EQ(x.ends_with(std::string_view(" helloworld")), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.starts_with(std::string_view("helloworld")), false);
-        CHECK_EQ(y.starts_with(std::string_view("ello")), false);
-    }
-    SUBCASE("ends_with_string") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.ends_with(stdb::memory::string("world")), true);
-        CHECK_EQ(x.ends_with(stdb::memory::string("ello")), false);
-        CHECK_EQ(x.ends_with(stdb::memory::string("helloworld")), true);
-        CHECK_EQ(x.ends_with(stdb::memory::string(" helloworld")), false);
-        stdb::memory::arena_string y(arena.get_memory_resource());
-        CHECK_EQ(y.ends_with(stdb::memory::string("helloworld")), false);
-        CHECK_EQ(y.ends_with(stdb::memory::string("ello")), false);
-        CHECK_EQ(y.ends_with(stdb::memory::string("")), true);
-    }
-}
-
-TEST_CASE("c++20 string contains") {
-    SUBCASE("contains_with_char") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.contains('l'), true);
-        CHECK_EQ(x.contains('z'), false);
-
-        stdb::memory::string y;
-        CHECK_EQ(y.contains('y'), false);
-        CHECK_EQ(y.contains(' '), false);
-    }
-    SUBCASE("contains_with_cstr") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.contains("world"), true);
-        CHECK_EQ(x.contains("llo"), true);
-        CHECK_EQ(x.contains("lol"), false);
-        CHECK_EQ(x.contains("helloworld"), true);
-        CHECK_EQ(x.contains(" helloworld"), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.contains("helloworld"), false);
-        CHECK_EQ(y.contains("ello"), false);
-        CHECK_EQ(y.contains(""), true);
-    }
-    SUBCASE("contains_with_string_view") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.contains(std::string_view("world")), true);
-        CHECK_EQ(x.contains(std::string_view("hello")), true);
-        CHECK_EQ(x.contains(std::string_view("xxx")), false);
-        CHECK_EQ(x.contains(std::string_view("helloworld")), true);
-        CHECK_EQ(x.contains(std::string_view(" helloworld")), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.contains(std::string_view("helloworld")), false);
-        CHECK_EQ(y.contains(std::string_view("ello")), false);
-        CHECK_EQ(y.contains(std::string_view("")), true);
-    }
-    SUBCASE("contains_with_string") {
-        stdb::memory::string x("helloworld");
-        CHECK_EQ(x.contains(stdb::memory::string("world")), true);
-        CHECK_EQ(x.contains(stdb::memory::string("ello")), true);
-        CHECK_EQ(x.contains(stdb::memory::string("xello")), false);
-        CHECK_EQ(x.contains(stdb::memory::string("helloworld")), true);
-        CHECK_EQ(x.contains(stdb::memory::string(" helloworld")), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.contains(stdb::memory::string("helloworld")), false);
-        CHECK_EQ(y.contains(stdb::memory::string("ello")), false);
-        CHECK_EQ(y.contains(stdb::memory::string("")), true);
-    }
-}
-
-TEST_CASE("c++20 arena_string contains") {
-    Arena arena(Arena::Options::GetDefaultOptions());
-    SUBCASE("contains_with_char") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.contains('d'), true);
-        CHECK_EQ(x.contains('x'), false);
-
-        stdb::memory::string y;
-        CHECK_EQ(y.contains('h'), false);
-    }
-    SUBCASE("contains_with_cstr") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.contains("world"), true);
-        CHECK_EQ(x.contains("ello"), true);
-        CHECK_EQ(x.contains("zzello"), false);
-        CHECK_EQ(x.contains("helloworld"), true);
-        CHECK_EQ(x.contains(" helloworld"), false);
-        stdb::memory::arena_string y(arena.get_memory_resource());
-        CHECK_EQ(y.contains("helloworld"), false);
-        CHECK_EQ(y.contains("ello"), false);
-        CHECK_EQ(y.contains(""), true);
-    }
-    SUBCASE("contains_with_string_view") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.contains(std::string_view("world")), true);
-        CHECK_EQ(x.contains(std::string_view("ello")), true);
-        CHECK_EQ(x.contains(std::string_view("zzello")), false);
-        CHECK_EQ(x.contains(std::string_view("helloworld")), true);
-        CHECK_EQ(x.contains(std::string_view(" helloworld")), false);
-        stdb::memory::string y;
-        CHECK_EQ(y.contains(std::string_view("helloworld")), false);
-        CHECK_EQ(y.contains(std::string_view("ello")), false);
-        CHECK_EQ(y.contains(std::string_view("")), true);
-    }
-    SUBCASE("contains_with_string") {
-        stdb::memory::arena_string x("helloworld", arena.get_memory_resource());
-        CHECK_EQ(x.contains(stdb::memory::string("world")), true);
-        CHECK_EQ(x.contains(stdb::memory::string("ello")), true);
-        CHECK_EQ(x.contains(stdb::memory::string("xello")), false);
-        CHECK_EQ(x.contains(stdb::memory::string("helloworld")), true);
-        CHECK_EQ(x.contains(stdb::memory::string(" helloworld")), false);
-        stdb::memory::arena_string y(arena.get_memory_resource());
-        CHECK_EQ(y.contains(stdb::memory::string("helloworld")), false);
-        CHECK_EQ(y.contains(stdb::memory::string("ello")), false);
-        CHECK_EQ(y.contains(stdb::memory::string("")), true);
-    }
-}
 
 TEST_CASE("string::testAllClauses") {
     std::cout << "Starting with seed: " << seed << std::endl;
     std::string r;
-    string c;
-    Arena arena(Arena::Options::GetDefaultOptions());
-    arena_string a{arena.get_memory_resource()};
+    small_string c;
+    pmr::small_string a{std::pmr::get_default_resource()};
 
     uint count = 0;
 
@@ -2365,48 +2068,6 @@ TEST_CASE("string::testAllClauses") {
     TEST_CLAUSE(21_4_8_9_a);
 }
 
-TEST_CASE("string::arena") {
-    auto arena = Arena(Arena::Options::GetDefaultOptions());
-
-    {
-        auto* str = arena.Create<string>();
-        CHECK(str != nullptr);
-        CHECK_EQ(str->size(), 0);
-        CHECK_EQ(*str, "");
-    }
-    {
-        auto* str = arena.Create<string>("");
-        CHECK(str != nullptr);
-        CHECK_EQ(str->size(), 0);
-        CHECK_EQ(*str, "");
-    }
-    {
-        auto* str = arena.Create<string>("\0");
-        CHECK(str != nullptr);
-        CHECK_EQ(str->size(), 0);
-        CHECK_EQ(*str, "");
-    }
-
-    {
-        auto* str = arena.Create<string>("12345");
-        CHECK(str != nullptr);
-        CHECK_EQ(str->size(), 5);
-        CHECK_EQ(*str, "12345");
-    }
-    {
-        auto* str = arena.Create<string>("12345\0");
-        CHECK(str != nullptr);
-        CHECK_EQ(str->size(), 5);
-        CHECK_EQ(*str, "12345");
-    }
-    {
-        auto* str = arena.Create<string>("1234567890abcdefghijklmnopqrstuvwxyz");
-        CHECK(str != nullptr);
-        CHECK_EQ(str->size(), 36);
-        CHECK_EQ(*str, "1234567890abcdefghijklmnopqrstuvwxyz");
-    }
-}
-
 TEST_CASE("string::testMoveCtor") {
     // Move constructor. Make sure we allocate a large string, so the
     // small string optimization doesn't kick in.
@@ -2494,11 +2155,6 @@ TEST_CASE("string::testFixedBugs_D580267_operator_add_assign") {
     string str(1337, 'f');
     string cp = str;
     cp += "bb";
-}
-
-TEST_CASE("string::testFixedBugs_D661622") {
-    stdb::memory::basic_string<wchar_t> s;
-    CHECK_EQ(0, s.size());
 }
 
 TEST_CASE("string::testFixedBugs_D785057") {
@@ -2606,35 +2262,11 @@ TEST_CASE("string::moveTerminator") {
  *   explicit basic_string(const A& a) noexcept;
  */
 
-struct TestStructDefaultAllocator
-{
-    stdb::memory::basic_string<char> stringMember;
-};
-
-std::atomic<size_t> allocatorConstructedCount(0);
-struct TestStructStringAllocator : std::allocator<char>
-{
-    TestStructStringAllocator() { ++allocatorConstructedCount; }
-};
-
-TEST_CASE("FBStringCtorTest::DefaultInitStructDefaultAlloc") {
-    TestStructDefaultAllocator t1{};
-    CHECK(t1.stringMember.empty());
-}
-
-TEST_CASE("FBStringCtorTest::NullZeroConstruction") {
-    char* p = nullptr;
-    size_t n = 0;
-    stdb::memory::string f(p, n);
-    CHECK_EQ(f.size(), 0);
-}
-
 // Tests for the comparison operators. I use CHECK rather than CHECK_LE
 // because what's under test is the operator rather than the relation between
 // the objects.
 
 TEST_CASE("string::compareToStdString") {
-    using stdb::memory::string;
     using namespace std::string_literals;
     auto stdA = "a"s;
     auto stdB = "b"s;
@@ -2746,7 +2378,6 @@ TEST_CASE("string::compareToStdString") {
 // lengths.
 
 TEST_CASE("string::compareToStdStringLong") {
-    using stdb::memory::string;
     using namespace std::string_literals;
     auto stdA = "1234567890a"s;
     auto stdB = "1234567890ab"s;
@@ -2802,269 +2433,21 @@ TEST_CASE("string::convertToStringView") {
     string s("foo");
     std::string_view sv = s;
     CHECK_EQ(sv, "foo");
-    basic_string<char, custom_traits> s2("bar");
-    std::basic_string_view<char, custom_traits> sv2 = s2;
+    small_string s2("bar");
+    std::string_view sv2 = s2;
     CHECK_EQ(sv2, "bar");
 }
 
-TEST_CASE("string::Format") { CHECK_EQ("  foo", std::format("{:>5}", stdb::memory::string("foo"))); }
+TEST_CASE("string::Format") { CHECK_EQ("  foo", std::format("{:>5}", small_string("foo"))); }
 
-TEST_CASE("string::OverLarge") {
-    CHECK_THROWS_AS(string().reserve((size_t)0xFFFF'FFFF'FFFF'FFFF), std::length_error);
-    CHECK_THROWS_AS(string_core<char32_t>().reserve((size_t)0x4000'0000'4000'0000), std::length_error);
-}
-
-TEST_CASE("string::Clone") {
-    SUBCASE("stack-based-small") {
-        string s1("foo");
-        auto s2 = s1.clone();
-        CHECK_EQ(s1, s2);
-        auto* data1 = s1.data();
-        auto* data2 = s2.data();
-        CHECK_NE(data1, data2);
-    }
-
-    SUBCASE("stack-based-medium") {
-        string m1("1234567890123456789012345678901234567890");
-        auto m2 = m1.clone();
-        CHECK_EQ(m1.length(), 40);
-        CHECK_EQ(m1, m2);
-        auto* data1 = m1.data();
-        auto* data2 = m2.data();
-        CHECK_NE(data1, data2);
-    }
-
-    SUBCASE("stack-based-large") {
-        string m1("1234567890123456789012345678901234567890");
-        string l1;
-        for (int i = 0; i < 125; ++i) {
-            l1.append(m1);
-        }
-        CHECK_EQ(l1.length(), 5000);
-        auto l2_cow = l1;
-        auto l2 = l1.clone();
-        CHECK_EQ(l1, l2);
-        CHECK_EQ(l1, l2_cow);
-        CHECK_EQ(l2_cow.data(), l1.data());
-        CHECK_NE(l2.data(), l1.data());
-    }
-
-    SUBCASE("heap-based-small") {
-        auto s1_up = std::make_unique<string>("123");
-        auto s2_up = std::make_unique<string>(s1_up->clone());
-        CHECK_EQ(*s1_up, *s2_up);
-        auto* data1 = s1_up->data();
-        auto* data2 = s2_up->data();
-        CHECK_NE(data1, data2);
-    }
-
-    SUBCASE("heap-based-medium") {
-        auto m1_up = std::make_unique<string>("1234567890123456789012345678901234567890");
-        auto m2_up = std::make_unique<string>(m1_up->clone());
-        CHECK_EQ(m1_up->length(), 40);
-        CHECK_EQ(*m1_up, *m2_up);
-        auto* data1 = m1_up->data();
-        auto* data2 = m2_up->data();
-        CHECK_NE(data1, data2);
-    }
-    SUBCASE("heap-based-large") {
-        string m1("1234567890123456789012345678901234567890");
-        auto l1_up = std::make_unique<string>();
-        for (int i = 0; i < 125; ++i) {
-            l1_up->append(m1);
-        }
-        CHECK_EQ(l1_up->length(), 5000);
-        auto l2_up = std::make_unique<string>(l1_up->clone());
-        auto l2_cow = *l1_up;
-        CHECK_EQ(*l1_up, *l2_up);
-        auto* data1 = l1_up->data();
-        auto* data2 = l2_up->data();
-        auto* data2_cow = l2_cow.data();
-        CHECK_EQ(data1, data2_cow);
-        CHECK_NE(data1, data2);
-    }
-}
-TEST_CASE("arena_string::normal") {
-    Arena arena(Arena::Options::GetDefaultOptions());
-    SUBCASE("Create") {
-        auto* str = arena.Create<arena_string>();
-        CHECK_EQ(*str, "");
-        CHECK_EQ(arena.check(reinterpret_cast<const char*>(str)), ArenaContainStatus::BlockUsed);
-        CHECK_EQ(arena.check(str->data()), ArenaContainStatus::BlockUsed);
-        auto* str1 = arena.Create<arena_string>("1234567");
-        CHECK_EQ(*str1, "1234567");
-        CHECK_EQ(arena.check(reinterpret_cast<const char*>(str1)), ArenaContainStatus::BlockUsed);
-        CHECK_EQ(arena.check(str1->data()), ArenaContainStatus::BlockUsed);
-    }
-    SUBCASE("cstr") {
-        arena_string str(arena.get_memory_resource());
-        CHECK_EQ(str, "");
-        CHECK_EQ(arena.check(str.data()), ArenaContainStatus::NotContain);
-        arena_string str1("1234567", arena.get_memory_resource());
-        CHECK_EQ(str1, "1234567");
-        CHECK_EQ(arena.check(str1.data()), ArenaContainStatus::NotContain);
-
-        arena_string str_long("12345671234567123456712345671234567", arena.get_memory_resource());
-        CHECK_EQ(arena.check(str_long.data()), ArenaContainStatus::BlockUsed);
-        str1.append(str_long.cbegin(), str_long.cend());
-    }
-
-    SUBCASE("copy") {
-        arena_string str("1234567", arena.get_memory_resource());
-        arena_string copied_str(str);
-        CHECK_EQ(arena.check(copied_str.data()), ArenaContainStatus::NotContain);
-        arena_string str_long("12345671234567123456712345671234567", arena.get_memory_resource());
-        arena_string copied_str_long(str_long);
-        CHECK_EQ(arena.check(copied_str_long.data()), ArenaContainStatus::BlockUsed);
-    }
-
-    SUBCASE("move") {
-        arena_string str("1234567", arena.get_memory_resource());
-        arena_string copied_str(std::move(str));
-        CHECK_EQ(arena.check(copied_str.data()), ArenaContainStatus::NotContain);
-        arena_string str_long("12345671234567123456712345671234567", arena.get_memory_resource());
-        arena_string copied_str_long(std::move(str_long));
-        CHECK_EQ(arena.check(copied_str_long.data()), ArenaContainStatus::BlockUsed);
-    }
-}
-
-TEST_CASE("arena_string::Clone") {
-    Arena arena(Arena::Options::GetDefaultOptions());
-
-    SUBCASE("create_small") {
-        auto* as1 = arena.Create<arena_string>("123");
-        auto as2 = as1->clone();
-        CHECK_EQ(*as1, as2);
-        auto* data1 = as1->data();
-        auto* data2 = as2.data();
-        CHECK_NE(data1, data2);
-    }
-
-    SUBCASE("small") {
-        arena_string as1(arena.get_memory_resource());
-        auto as2 = as1.clone();
-        CHECK_EQ(as1, as2);
-        auto* data1 = as1.data();
-        auto* data2 = as2.data();
-        CHECK_NE(data1, data2);
-    }
-
-    SUBCASE("create_medium") {
-        auto* as1 = arena.Create<arena_string>("1234567890123456789012345678901234567890");
-        auto as2 = as1->clone();
-        CHECK_EQ(*as1, as2);
-        auto* data1 = as1->data();
-        auto* data2 = as2.data();
-        CHECK_NE(data1, data2);
-    }
-
-    SUBCASE("medium") {
-        arena_string as1("1234567890123456789012345678901234567890", arena.get_memory_resource());
-        auto as2 = as1.clone();
-        CHECK_EQ(as1, as2);
-        auto* data1 = as1.data();
-        auto* data2 = as2.data();
-        CHECK_NE(data1, data2);
-    }
-
-    SUBCASE("create_large") {
-        auto* m1 = arena.Create<arena_string>("1234567890123456789012345678901234567890");
-        auto* l1 = arena.Create<arena_string>();
-        for (int i = 0; i < 125; ++i) {
-            l1->append(*m1);
-        }
-        CHECK_EQ(l1->length(), 5000);
-        auto l2(l1->clone());
-        auto l2_cow = *l1;
-        CHECK_EQ(*l1, l2);
-        auto* data1 = l1->data();
-        auto* data2 = l2.data();
-        auto* data2_cow = l2_cow.data();
-        CHECK_EQ(data1, data2_cow);
-        CHECK_NE(data1, data2);
-    }
-
-    SUBCASE("large") {
-        arena_string m1("1234567890123456789012345678901234567890", arena.get_memory_resource());
-        arena_string l1(arena.get_memory_resource());
-        for (int i = 0; i < 125; ++i) {
-            l1.append(m1);
-        }
-        CHECK_EQ(l1.length(), 5000);
-        auto l2(l1.clone());
-        auto l2_cow = l1;
-        CHECK_EQ(l1, l2);
-        auto* data1 = l1.data();
-        auto* data2 = l2.data();
-        auto* data2_cow = l2_cow.data();
-        CHECK_EQ(data1, data2_cow);
-        CHECK_NE(data1, data2);
-    }
-}
-
-TEST_CASE("arena_string::normal") {
-    Arena arena(Arena::Options::GetDefaultOptions());
-    SUBCASE("Create") {
-        auto* str = arena.Create<arena_string>();
-        CHECK_EQ(*str, "");
-        CHECK_EQ(arena.check(reinterpret_cast<const char*>(str)), ArenaContainStatus::BlockUsed);
-        CHECK_EQ(arena.check(str->data()), ArenaContainStatus::BlockUsed);
-        auto* str1 = arena.Create<arena_string>("1234567");
-        CHECK_EQ(*str1, "1234567");
-        CHECK_EQ(arena.check(reinterpret_cast<const char*>(str1)), ArenaContainStatus::BlockUsed);
-        CHECK_EQ(arena.check(str1->data()), ArenaContainStatus::BlockUsed);
-    }
-    SUBCASE("cstr") {
-        arena_string str(arena.get_memory_resource());
-        CHECK_EQ(str, "");
-        CHECK_EQ(arena.check(str.data()), ArenaContainStatus::NotContain);
-        arena_string str1("1234567", arena.get_memory_resource());
-        CHECK_EQ(str1, "1234567");
-        CHECK_EQ(arena.check(str1.data()), ArenaContainStatus::NotContain);
-
-        arena_string str_long("12345671234567123456712345671234567", arena.get_memory_resource());
-        CHECK_EQ(arena.check(str_long.data()), ArenaContainStatus::BlockUsed);
-        str1.append(str_long.cbegin(), str_long.cend());
-    }
-
-    SUBCASE("copy") {
-        arena_string str("1234567", arena.get_memory_resource());
-        arena_string copied_str(str);
-        CHECK_EQ(arena.check(copied_str.data()), ArenaContainStatus::NotContain);
-        arena_string str_long("12345671234567123456712345671234567", arena.get_memory_resource());
-        arena_string copied_str_long(str_long);
-        CHECK_EQ(arena.check(copied_str_long.data()), ArenaContainStatus::BlockUsed);
-    }
-
-    SUBCASE("move") {
-        arena_string str("1234567", arena.get_memory_resource());
-        arena_string copied_str(std::move(str));
-        CHECK_EQ(arena.check(copied_str.data()), ArenaContainStatus::NotContain);
-        arena_string str_long("12345671234567123456712345671234567", arena.get_memory_resource());
-        arena_string copied_str_long(std::move(str_long));
-        CHECK_EQ(arena.check(copied_str_long.data()), ArenaContainStatus::BlockUsed);
-    }
-}
-
-TEST_CASE("arena_string::Create_variant") {
-    using Expr = std::variant<bool, arena_string>;
-    using Expr1 = std::variant<bool, string>;
-    Arena arena(Arena::Options::GetDefaultOptions());
-    [[maybe_unused]] auto* rst = arena.Create<Expr>();
-    [[maybe_unused]] auto* rst1 = arena.Create<Expr1>();
-    CHECK_EQ(Constructable<arena_string>, true);
-    CHECK_EQ(Constructable<string>, true);
-}
-
-TEST_CASE("arena_string::testAllClauses") {
+TEST_CASE("pmr::small_string::testAllClauses") {
     std::cout << "Starting with seed: " << seed << std::endl;
     std::string r;
 
     uint count = 0;
 
-    Arena arena(Arena::Options::GetDefaultOptions());
-    arena_string c(arena.get_memory_resource());
-    auto l = [&](const char* const clause, void (*f_string)(std::string&), void (*f_arena_string)(arena_string&)) {
+    pmr::small_string c(std::pmr::get_default_resource());
+    auto l = [&](const char* const clause, void (*f_string)(std::string&), void (*f_arena_string)(pmr::small_string&)) {
         do {
             // NOLINTNEXTLINE
             if (true) {
@@ -3083,7 +2466,7 @@ TEST_CASE("arena_string::testAllClauses") {
         } while (++count % 100 != 0);
     };
 
-#define TEST_CLAUSE_ARENA(x) l(#x, arena_clause11_##x<std::string>, arena_clause11_##x<arena_string>);
+#define TEST_CLAUSE_ARENA(x) l(#x, arena_clause11_##x<std::string>, arena_clause11_##x<pmr::small_string>);
 
     //    TEST_CLAUSE_ARENA(21_4_2_a);
     TEST_CLAUSE_ARENA(21_4_2_b);
@@ -3264,95 +2647,6 @@ TEST_CASE("string::cross cpu move") {
         t1.join();
     }
     */
-}
-
-TEST_CASE("arena-string::cross cpu move") {
-    SUBCASE("arena-string-small") {
-        Arena arena(Arena::Options::GetDefaultOptions());
-        arena_string origin_small("123456789", arena.get_memory_resource());
-
-        // NOTICE: passed by ref cross thread is not a good practice
-        std::thread t1([&, new_small = std::move(origin_small)]() {
-            // new_small.append("0");
-            // std::cout << new_small << std::endl;
-        });
-        t1.join();
-    }
-    SUBCASE("arena-string-median") {
-        Arena arena(Arena::Options::GetDefaultOptions());
-        arena_string origin_median("1234567890123456789012345678901234567890", arena.get_memory_resource());
-
-        // NOTICE: passed by ref cross thread is not a good practice
-        std::thread t2([&, new_median = std::move(origin_median)]() mutable {
-            new_median.append("0");
-            // std::cout << new_median << std::endl;
-        });
-        t2.join();
-    }
-    SUBCASE("arena-string-large") {
-        Arena arena(Arena::Options::GetDefaultOptions());
-        arena_string origin_large("1234567890123456789012345678901234567890", arena.get_memory_resource());
-        for (int i = 0; i < 125; ++i) {
-            origin_large.append("1234567890123456789012345678901234567890");
-        }
-        // NOTICE: passed by ref cross thread is not a good practice
-        std::thread t3([&, new_large = std::move(origin_large)]() mutable {
-            new_large.append("0");
-            // std::cout << new_large << std::endl;
-        });
-        t3.join();
-    }
-}
-
-TEST_CASE("string::clone") {
-    string origin_small("123456789");
-    string origin_small_duplicated(origin_small);
-
-    // NOTICE: passed by ref cross thread is not a good practice
-    std::thread t1([&, new_origin_small = origin_small.clone()]() {
-        // new_origin_small.append("0");
-        // std::cout << new_origin_small << std::endl;
-    });
-    t1.join();
-}
-
-TEST_CASE("string::clone-then-move") {
-    SUBCASE("string") {
-        string origin_small("123456789");
-        string origin_small_duplicated(origin_small);
-        origin_small_duplicated.append("$");
-
-        // NOTICE: passed by ref cross thread is not a good practice
-        std::thread t1([&, new_origin_small = origin_small.clone()]() mutable {
-            auto moved_small = std::move(new_origin_small);
-            new_origin_small.append("0");
-            // std::cout << new_origin_small << std::endl;
-        });
-        t1.join();
-    }
-
-    SUBCASE("arena-string") {
-        Arena arena(Arena::Options::GetDefaultOptions());
-        arena_string origin_small("123456789", arena.get_memory_resource());
-        arena_string origin_small_duplicated(origin_small);
-        origin_small_duplicated.append("$");
-
-        // NOTICE: passed by ref cross thread is not a good practice
-        std::thread t1([&, new_origin_small = origin_small.clone()]() mutable {
-            auto moved_small = std::move(new_origin_small);
-            new_origin_small.append("0");
-            // std::cout << new_origin_small << std::endl;
-        });
-        t1.join();
-    }
-}
-
-TEST_CASE("arena-string::dstr") {
-    Arena arena{Arena::Options::GetDefaultOptions()};
-    arena_string str{
-      "1231222222222222222222222222222222242314231432142134151253453426342623462362362363262363262362364234623462632632"
-      "36262626236234623463246262623626262364326236236236236",
-      arena.get_memory_resource()};
 }
 
 TEST_CASE("string::contains_zero") {
@@ -3554,11 +2848,13 @@ TEST_CASE("small_string::hash") {
     small_byte_string str1("1234567890");
     CHECK_EQ(std::hash<basic_small_string<char>>{}(str1), std::hash<std::string>{}("1234567890"));
 
-    Arena arena(Arena::Options::GetDefaultOptions());
-    pmr::small_string str2("1234567890", arena.get_memory_resource());
+    std::byte buffer[64 * 1024];
+    std::pmr::monotonic_buffer_resource pool{buffer, sizeof(buffer)};
+
+    pmr::small_string str2("1234567890", &pool);
     CHECK_EQ(std::hash<basic_small_string<char>>{}(str2), std::hash<std::string>{}("1234567890"));
 
-    pmr::small_byte_string str3("1234567890", arena.get_memory_resource());
+    pmr::small_byte_string str3("1234567890", std::pmr::get_default_resource());
     CHECK_EQ(std::hash<basic_small_string<char>>{}(str3), std::hash<std::string>{}("1234567890"));
 }
 
@@ -3970,14 +3266,16 @@ TEST_CASE("small_byte_string::size") {
 }
 
 TEST_CASE("pmr::small_string::cmp") {
-    Arena arena(Arena::Options::GetDefaultOptions());
-    std::pmr::polymorphic_allocator<char> allocator(arena.get_memory_resource());
+    std::byte buffer[64 * 1024];
+    std::pmr::monotonic_buffer_resource pool{buffer, sizeof(buffer)};
+    std::pmr::polymorphic_allocator<char> allocator(&pool);
     operator_of_cmp<pmr::small_string>(allocator);
 }
 
 TEST_CASE("pmr::small_byte_string::cmp") {
-    Arena arena(Arena::Options::GetDefaultOptions());
-    std::pmr::polymorphic_allocator<char> allocator(arena.get_memory_resource());
+    std::byte buffer[64 * 1024];
+    std::pmr::monotonic_buffer_resource pool{buffer, sizeof(buffer)};
+    std::pmr::polymorphic_allocator<char> allocator(&pool);
     operator_of_cmp<pmr::small_byte_string>(allocator);
 }
 
@@ -4099,9 +3397,10 @@ TEST_CASE("small_string::testAllClauses") {
 }
 
 TEST_CASE("pmr_small_string::eq") {
-    Arena arena(Arena::Options::GetDefaultOptions());
-    pmr::small_string str1("1234567890", arena.get_memory_resource());
-    pmr::small_string str2("1234567890", arena.get_memory_resource());
+    std::byte buffer[1024 * 64];
+    std::pmr::monotonic_buffer_resource pool{buffer, sizeof(buffer)};
+    pmr::small_string str1("1234567890", &pool);
+    pmr::small_string str2("1234567890", &pool);
     CHECK_EQ(str1, str2);
     CHECK_EQ(str1, "1234567890");
     std::string std_str("1234567890");
@@ -4109,22 +3408,25 @@ TEST_CASE("pmr_small_string::eq") {
 }
 
 TEST_CASE("pmr_small_string::test_allocator") {
-    Arena arena(Arena::Options::GetDefaultOptions());
-    pmr::small_string arena_str("1234567890", arena.get_memory_resource());
+    std::byte buffer[1024 * 64];
+    std::pmr::monotonic_buffer_resource pool{buffer, sizeof(buffer)};
+    pmr::small_string arena_str("1234567890", &pool);
     // will crash for the Assert.
     // pmr::small_string std_str("1234567890");
 
     // check the allocator is std::pmr::polymorphic_allocator
-    CHECK_EQ(arena_str.get_allocator().resource(), arena.get_memory_resource());
+    CHECK_EQ(arena_str.get_allocator().resource(), &pool);
     // CHECK_EQ(std_str.get_allocator().resource(), std::pmr::get_default_resource());
 }
 
 TEST_CASE("pmr_small_string::testAllClauses") {
     using pmr_small_string = pmr::small_string;
     std::cout << "Starting pmr_small_string tests with seed: " << seed << std::endl;
-    Arena arena(Arena::Options::GetDefaultOptions());
+    // Arena arena(Arena::Options::GetDefaultOptions());
+    std::byte buffer[1024*64];
+    std::pmr::monotonic_buffer_resource pool{buffer, sizeof(buffer)};
     std::string r;
-    pmr_small_string c(arena.get_memory_resource());
+    pmr_small_string c(&pool);
 
     uint count = 0;
 
@@ -4359,9 +3661,10 @@ TEST_CASE("small_string_not_null_terminated::testAllClauses") {
 TEST_CASE("pmr_small_string::testAllClauses") {
     using pmr_small_byte_string = pmr::small_byte_string;
     std::cout << "Starting pmr_small_byte_string tests with seed: " << seed << std::endl;
-    Arena arena(Arena::Options::GetDefaultOptions());
+    std::byte buffer[1024*64];
+    std::pmr::monotonic_buffer_resource pool{buffer, sizeof(buffer)};
     std::string r;
-    pmr_small_byte_string c(arena.get_memory_resource());
+    pmr_small_byte_string c(&pool);
 
     uint count = 0;
 

@@ -1,3 +1,6 @@
 [submodule "doctest"]
 	path = doctest
 	url = https://github.com/doctest/doctest.git
+[submodule "benchmark"]
+	path = benchmark
+	url = https://github.com/google/benchmark.git

@@ -37,13 +37,11 @@ LICENSE.txt           # Apache 2.0 license
 ```
 
 ### Building and Testing
+mkdir build.debug
+cd build.debug
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+ninja reg_test
 
-This is a header-only library with no build system configured. To use:
-1. Include `include/smallstring.hpp` in your project
-2. Ensure dependencies are available:
-   - `align/align.hpp`
-   - `assert_config.hpp`
-   - C++20 standard library features (`<format>`, `<memory_resource>`, etc.)
 
 ### Memory Management
 

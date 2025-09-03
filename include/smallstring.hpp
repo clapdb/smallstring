@@ -540,6 +540,7 @@ struct malloc_core
                 internal.internal_size = static_cast<uint8_t>(new_size);
                 // set the terminator
                 if constexpr (NullTerminated) {
+                    Assert(internal.internal_size < 7, "internal size exceeds limit");
                     internal.data[internal.internal_size] = '\0';
                 }
                 break;

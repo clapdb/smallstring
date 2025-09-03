@@ -32,13 +32,9 @@
 #include <utility>
 
 namespace small {
-namespace detail {
-    template<typename T>
-    constexpr void assert_with_message(bool condition, T&& message) noexcept {
-        assert(condition && message);
-    }
-}
-#define Assert(condition, message) ::small::detail::assert_with_message((condition), (message))
+#ifndef Assert
+#define Assert(condition, message) assert((condition) && (message))
+#endif
 namespace {
 inline constexpr uint64_t kMinAlignSize = 8;  // 64 bits for modern cpu
 /**

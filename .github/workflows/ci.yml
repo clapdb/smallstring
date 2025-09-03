@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, ci ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+        compiler: [gcc, clang]
+        
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build cmake build-essential
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          sudo apt-get install -y clang libc++-dev libc++abi-dev
+        fi
+
+    - name: Setup compiler
+      run: |
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+        else
+          echo "CC=gcc" >> $GITHUB_ENV
+          echo "CXX=g++" >> $GITHUB_ENV
+        fi
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. -GNinja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+    - name: Build unit tests
+      run: |
+        cd build
+        ninja unit_tests
+
+    - name: Run unit tests
+      run: |
+        cd build
+        ./unit/unit_tests
+
+    - name: Build regression tests
+      run: |
+        cd build
+        ninja reg_test
+
+    - name: Run regression tests
+      run: |
+        cd build
+        ./regression/reg_test

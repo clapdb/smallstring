@@ -145,7 +145,12 @@ TEST_CASE("smallstring edge cases and error conditions") {
         small::small_string str("self");
         
         // Self copy assignment
+        #pragma GCC diagnostic push
+        #ifdef __clang__
+        #pragma clang diagnostic ignored "-Wself-assign-overloaded"
+        #endif
         str = str;
+        #pragma GCC diagnostic pop
         CHECK(str == "self");
         CHECK(str.size() == 4);
         

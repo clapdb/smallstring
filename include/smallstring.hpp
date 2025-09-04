@@ -32,13 +32,9 @@
 #include <utility>
 
 namespace small {
-namespace detail {
-    template<typename T>
-    constexpr void assert_with_message(bool condition, T&& message) noexcept {
-        assert(condition && message);
-    }
-}
-#define Assert(condition, message) ::small::detail::assert_with_message((condition), (message))
+#ifndef Assert
+#define Assert(condition, message) assert((condition) && (message))
+#endif
 namespace {
 inline constexpr uint64_t kMinAlignSize = 8;  // 64 bits for modern cpu
 /**
@@ -544,6 +540,7 @@ struct malloc_core
                 internal.internal_size = static_cast<uint8_t>(new_size);
                 // set the terminator
                 if constexpr (NullTerminated) {
+                    Assert(internal.internal_size < 7, "internal size exceeds limit");
                     internal.data[internal.internal_size] = '\0';
                 }
                 break;

@@ -1102,19 +1102,15 @@ void arena_clause11_21_4_6_6(String& test) {
 
 template <class String>
 void clause11_21_4_6_7(String& test) {
-    std::vector<typename String::value_type> vec(random(0, maxString));
-    if (vec.empty()) {
-        return;
-    }
+    auto size = random(1, maxString);
+    std::vector<typename String::value_type> vec(size);
     test.copy(vec.data(), vec.size(), random(0, test.size()));
 }
 
 template <class String>
 void arena_clause11_21_4_6_7(String& test) {
-    std::vector<typename String::value_type> vec(random(0, maxString));
-    if (vec.empty()) {
-        return;
-    }
+    auto size = random(1, maxString);
+    std::vector<typename String::value_type> vec(size);
     test.copy(vec.data(), vec.size(), random(0, test.size()));
 }
 

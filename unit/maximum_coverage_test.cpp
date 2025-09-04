@@ -120,7 +120,12 @@ TEST_CASE("assignment_operations") {
     
     SUBCASE("self_assignment") {
         small::small_string s("test");
+        #pragma GCC diagnostic push
+        #ifdef __clang__
+        #pragma clang diagnostic ignored "-Wself-assign-overloaded"
+        #endif
         s = s;  // Self assignment
+        #pragma GCC diagnostic pop
         CHECK(s == "test");
     }
     

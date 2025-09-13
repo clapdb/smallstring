@@ -53,7 +53,7 @@ void randomString(String* toFill, unsigned int maxSize = 1000) {
 
 template <class String, class Integral>
 void Num2String(String& str, Integral n) {
-    std::string tmp = std::format("{}", n);
+    std::string tmp = fmt::format("{}", n);
     str = String(tmp.begin(), tmp.end(), str.get_allocator());
 }
 
@@ -2434,7 +2434,7 @@ TEST_CASE("string::convertToStringView") {
     CHECK_EQ(sv2, "bar");
 }
 
-TEST_CASE("string::Format") { CHECK_EQ("  foo", std::format("{:>5}", small_string("foo"))); }
+TEST_CASE("string::Format") { CHECK_EQ("  foo", fmt::format("{:>5}", small_string("foo"))); }
 
 TEST_CASE("pmr::small_string::testAllClauses") {
     std::cout << "Starting with seed: " << seed << std::endl;

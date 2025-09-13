@@ -20,7 +20,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <format>
 #include <initializer_list>
 #include <iterator>
 #include <limits>
@@ -30,6 +29,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <fmt/format.h>
 
 namespace small {
 #ifndef Assert
@@ -5248,10 +5248,10 @@ static_assert(sizeof(small_string) == 8, "small_string should be same as a point
 static_assert(sizeof(small_byte_string) == 8, "small_byte_string should be same as a pointer");
 
 /**
- * @brief Converts a value to a small string using std::format.
+ * @brief Converts a value to a small string using fmt::format.
  *
  * This function template provides a generic way to convert any formattable value
- * to a small string type using C++20's std::format functionality.
+ * to a small string type using fmt::format functionality.
  *
  * @tparam String The target small string type to create
  * @tparam T The type of value to convert (must be formattable)
@@ -5259,14 +5259,14 @@ static_assert(sizeof(small_byte_string) == 8, "small_byte_string should be same 
  * @return A String object containing the formatted representation of value
  *
  * @complexity Linear in the formatted size of the value
- * @note Requires C++20 std::format support
- * @note Uses std::formatted_size for efficient memory allocation
+ * @note Requires fmt::format support
+ * @note Uses fmt::formatted_size for efficient memory allocation
  */
 template <typename String, typename T>
 auto to_small_string(T value) -> String {
-    auto size = std::formatted_size("{}", value);
+    auto size = fmt::formatted_size("{}", value);
     auto formatted = String::create_uninitialized_string(size);
-    std::format_to(formatted.data(), "{}", value);
+    fmt::format_to(formatted.data(), "{}", value);
     return formatted;
 }
 
@@ -5327,22 +5327,22 @@ auto to_small_string(std::string_view view) -> String {
 // decl the formatter of small_string
 
 /**
- * @brief std::format specialization for basic_small_string
- * @note Enables use of basic_small_string with std::format, std::print, etc.
+ * @brief fmt::format specialization for basic_small_string
+ * @note Enables use of basic_small_string with fmt::format, etc.
  * @note Inherits formatting behavior from std::string_view formatter
  * @note Provides zero-copy formatting by creating string_view from string data
  */
 template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
           template <typename, bool> class Core, class Traits, class Allocator, bool NullTerminated, float Growth>
-struct std::formatter<small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated, Growth>>
-    : formatter<string_view>
+struct fmt::formatter<small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated, Growth>>
+    : fmt::formatter<std::string_view>
 {
-    using formatter<std::string_view>::parse;
+    using fmt::formatter<std::string_view>::parse;
 
     auto format(const small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated>& str,
-                std::format_context& ctx) const noexcept {
-        return formatter<string_view>::format({str.data(), str.size()}, ctx);
+                fmt::format_context& ctx) const noexcept {
+        return fmt::formatter<std::string_view>::format({str.data(), str.size()}, ctx);
     }
 };
 
@@ -5355,10 +5355,10 @@ using small_byte_string = basic_small_string<char, small_string_buffer, pmr_core
 static_assert(sizeof(small_string) == 16, "small_string should be same as a pointer");
 
 /**
- * @brief Converts a value to a PMR small string using std::format.
+ * @brief Converts a value to a PMR small string using fmt::format.
  *
  * This function template provides a generic way to convert any formattable value
- * to a PMR-based small string type using C++20's std::format functionality and
+ * to a PMR-based small string type using fmt::format functionality and
  * a custom polymorphic allocator.
  *
  * @tparam String The target PMR small string type to create
@@ -5368,15 +5368,15 @@ static_assert(sizeof(small_string) == 16, "small_string should be same as a poin
  * @return A String object containing the formatted representation of value
  *
  * @complexity Linear in the formatted size of the value
- * @note Requires C++20 std::format support and C++17 PMR
- * @note Uses std::formatted_size for efficient memory allocation
+ * @note Requires fmt::format support and C++17 PMR
+ * @note Uses fmt::formatted_size for efficient memory allocation
  * @note Memory is allocated using the provided polymorphic allocator
  */
 template <typename String, typename T>
 auto to_small_string(T value, std::pmr::polymorphic_allocator<char> allocator) -> String {
-    auto size = std::formatted_size("{}", value);
+    auto size = fmt::formatted_size("{}", value);
     auto formatted = String::create_uninitialized_string(size, allocator);
-    std::format_to(formatted.data(), "{}", value);
+    fmt::format_to(formatted.data(), "{}", value);
     return formatted;
 }
 

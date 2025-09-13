@@ -1,5 +1,6 @@
 #include "doctest/doctest/doctest.h"
 #include "include/smallstring.hpp"
+#include <array>
 #include <memory_resource>
 
 // Tests targeting uncovered lines and buffer type transitions
@@ -116,7 +117,7 @@ TEST_CASE("buffer type transitions during growth") {
 TEST_CASE("PMR allocator with different buffer types") {
     // Test PMR allocator paths for all buffer sizes
     std::array<std::byte, 4096> buffer;
-    std::pmr::monotonic_buffer_resource mbr{buffer.data(), buffer.size()};
+    std::pmr::monotonic_buffer_resource mbr{static_cast<void*>(buffer.data()), buffer.size()};
     std::pmr::polymorphic_allocator<char> alloc{&mbr};
     
     // Internal buffer with PMR
@@ -149,7 +150,7 @@ TEST_CASE("PMR allocator with different buffer types") {
 TEST_CASE("PMR allocator non-null-terminated strings") {
     // Test PMR byte strings (NullTerminated=false)
     std::array<std::byte, 2048> buffer;
-    std::pmr::monotonic_buffer_resource mbr{buffer.data(), buffer.size()};
+    std::pmr::monotonic_buffer_resource mbr{static_cast<void*>(buffer.data()), buffer.size()};
     std::pmr::polymorphic_allocator<char> alloc{&mbr};
     
     small::pmr::small_byte_string pmr_byte("PMR byte", alloc);

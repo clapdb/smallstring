@@ -25,5 +25,5 @@ list(APPEND TEST_FLAGS
   -Wno-deprecated
 )
 
-target_link_libraries(reg_test PRIVATE pthread doctest)
+target_link_libraries(reg_test PRIVATE pthread doctest fmt)
 

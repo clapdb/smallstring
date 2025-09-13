@@ -26,7 +26,7 @@ list(APPEND TEST_FLAGS
 )
 
 target_compile_options(unit_tests PRIVATE ${TEST_FLAGS})
-target_link_libraries(unit_tests PRIVATE pthread doctest)
+target_link_libraries(unit_tests PRIVATE pthread doctest fmt)
 
 # Add coverage flags if ENABLE_COVERAGE is set
 if(ENABLE_COVERAGE)

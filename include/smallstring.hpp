@@ -1432,10 +1432,11 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use for memory management
      * @note String data is uninitialized and must be filled manually
      */
-    constexpr basic_small_string(initialized_later, size_type new_string_size, const Allocator& allocator = Allocator())
+    constexpr basic_small_string(initialized_later /*unused*/, size_t new_string_size,
+                                 const Allocator& allocator = Allocator())
         : buffer_type(allocator) {
-        Assert((new_string_size + Core<Char, NullTerminated>::median_long_buffer_header_size()) <=
-                 std::numeric_limits<size_type>::max(),
+        Assert((static_cast<size_type>(new_string_size) +
+                Core<Char, NullTerminated>::median_long_buffer_header_size()) <= std::numeric_limits<size_type>::max(),
                "the new_string_size should be less than the max value of size_type");
         buffer_type::initial_allocate(static_cast<size_type>(new_string_size));
     }
@@ -1447,8 +1448,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use for memory management
      * @note Advanced constructor for explicit buffer type control
      */
-    constexpr basic_small_string(initialized_later, buffer_type_and_size<size_type> type_and_size,
-                                 size_type new_string_size, const Allocator& allocator = Allocator())
+    constexpr basic_small_string(initialized_later /*unused*/, buffer_type_and_size<size_type> type_and_size,
+                                 size_t new_string_size, const Allocator& allocator = Allocator())
         : buffer_type(allocator) {
         buffer_type::initial_allocate(type_and_size, new_string_size);
     }
@@ -1460,8 +1461,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @return Uninitialized string with reserved capacity
      * @note Preferred over direct constructor for clarity
      */
-    static constexpr auto create_uninitialized_string(size_type new_string_size,
-                                                      const Allocator& allocator = Allocator()) -> basic_small_string {
+    static constexpr auto create_uninitialized_string(size_t new_string_size, const Allocator& allocator = Allocator())
+      -> basic_small_string {
         return basic_small_string(initialized_later{}, new_string_size, allocator);
     }
 
@@ -1470,7 +1471,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use for memory management
      * @note Creates empty string with no allocation
      */
-    constexpr basic_small_string([[maybe_unused]] const Allocator& allocator = Allocator()) noexcept
+    constexpr explicit basic_small_string([[maybe_unused]] const Allocator& allocator = Allocator()) noexcept
         : buffer_type(allocator) {}
 
     /**
@@ -1480,7 +1481,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use for memory management
      * @note Creates string like "aaaaa" if ch='a' and count=5
      */
-    constexpr basic_small_string(size_type count, Char ch, [[maybe_unused]] const Allocator& allocator = Allocator())
+    constexpr basic_small_string(size_t count, Char ch, [[maybe_unused]] const Allocator& allocator = Allocator())
         : basic_small_string(initialized_later{}, count, allocator) {
         memset(data(), ch, count);
     }
@@ -1513,7 +1514,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use
      * @note Creates copy of other[pos:] (from pos to end)
      */
-    constexpr basic_small_string(const basic_small_string& other, size_type pos,
+    constexpr basic_small_string(const basic_small_string& other, size_t pos,
                                  [[maybe_unused]] const Allocator& allocator = Allocator())
         : basic_small_string(other.substr(pos)) {}
 
@@ -1534,7 +1535,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use
      * @note Creates new string from other[pos:] using move semantics
      */
-    constexpr basic_small_string(basic_small_string&& other, size_type pos,
+    constexpr basic_small_string(basic_small_string&& other, size_t pos,
                                  [[maybe_unused]] const Allocator& allocator = Allocator())
         : basic_small_string{other.substr(pos)} {}
 
@@ -1546,7 +1547,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use
      * @note Creates copy of other[pos:pos+count]
      */
-    constexpr basic_small_string(const basic_small_string& other, size_type pos, size_type count,
+    constexpr basic_small_string(const basic_small_string& other, size_t pos, size_t count,
                                  [[maybe_unused]] const Allocator& allocator = Allocator())
         : basic_small_string{other.substr(pos, count)} {}
 
@@ -1558,7 +1559,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use
      * @note Creates new string from other[pos:pos+count] using move semantics
      */
-    constexpr basic_small_string(basic_small_string&& other, size_type pos, size_type count,
+    constexpr basic_small_string(basic_small_string&& other, size_t pos, size_t count,
                                  [[maybe_unused]] const Allocator& allocator = Allocator())
         : basic_small_string{other.substr(pos, count), allocator} {}
 
@@ -1569,7 +1570,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use
      * @note Does not require null termination, copies exactly count characters
      */
-    constexpr basic_small_string(const Char* s, size_type count,
+    constexpr basic_small_string(const Char* s, size_t count,
                                  [[maybe_unused]] const Allocator& allocator = Allocator())
         : basic_small_string(initialized_later{}, count, allocator) {
         std::memcpy(data(), s, count);

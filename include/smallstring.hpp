@@ -1471,7 +1471,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Allocator instance to use for memory management
      * @note Creates empty string with no allocation
      */
-    constexpr explicit basic_small_string([[maybe_unused]] const Allocator& allocator = Allocator()) noexcept
+    constexpr basic_small_string([[maybe_unused]] const Allocator& allocator = Allocator()) noexcept
         : buffer_type(allocator) {}
 
     /**

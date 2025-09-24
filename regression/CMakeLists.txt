@@ -1,5 +1,5 @@
 #[[
-Licensed under the Apache License, Version 2.0 (the "License");
+Licensed under the Apache License, Version 2.0(the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -20,10 +20,11 @@ add_executable(reg_test EXCLUDE_FROM_ALL ${REG_SRC})
 
 ## test flags
 list(APPEND TEST_FLAGS
-  #-DBOOST_STACKTRACE_USE_BACKTRACE
+#- DBOOST_STACKTRACE_USE_BACKTRACE
   -DDOCTEST_CONFIG_SUPER_FAST_ASSERTS
   -Wno-deprecated
 )
 
-target_link_libraries(reg_test PRIVATE pthread doctest fmt)
+target_compile_options(reg_test PRIVATE ${TEST_FLAGS})
 
+target_link_libraries(reg_test PRIVATE pthread doctest fmt)

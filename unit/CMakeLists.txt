@@ -1,5 +1,5 @@
 #[[
-Licensed under the Apache License, Version 2.0 (the "License");
+Licensed under the Apache License, Version 2.0(the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -20,7 +20,6 @@ add_executable(unit_tests EXCLUDE_FROM_ALL ${UNIT_SRC})
 
 ## test flags
 list(APPEND TEST_FLAGS
-  #-DBOOST_STACKTRACE_USE_BACKTRACE
   -DDOCTEST_CONFIG_SUPER_FAST_ASSERTS
   -Wno-deprecated
 )
@@ -28,7 +27,7 @@ list(APPEND TEST_FLAGS
 target_compile_options(unit_tests PRIVATE ${TEST_FLAGS})
 target_link_libraries(unit_tests PRIVATE pthread doctest fmt)
 
-# Add coverage flags if ENABLE_COVERAGE is set
+#Add coverage flags if ENABLE_COVERAGE is set
 if(ENABLE_COVERAGE)
     target_compile_options(unit_tests PRIVATE --coverage -fprofile-arcs -ftest-coverage)
     target_link_options(unit_tests PRIVATE --coverage)

@@ -16,7 +16,7 @@
 #include <random>   // for mt19937, uniform_int_distribution
 #include <sstream>  // for operator<<, basic_istream, basic_string...
 #include <thread>
-#include <vector>       // for vector
+#include <vector>  // for vector
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"  // for binary_assert, CHECK_EQ, TestCase, CHECK
@@ -24,12 +24,24 @@
 
 namespace small {
 
-static const uint seed = std::chrono::system_clock::now().time_since_epoch().count();
+static const uint seed = static_cast<uint>(std::chrono::system_clock::now().time_since_epoch().count());
 using RandomT = std::mt19937;
 static RandomT rng(seed);
 static const size_t maxString = 100;
 static const bool avoidAliasing = true;
 using string = small_string;
+
+// Specialization for smallstring size_type (uint32_t) when called with int literal
+inline auto random(int low, std::uint32_t up) -> std::uint32_t {
+    std::uniform_int_distribution<std::uint32_t> range(static_cast<std::uint32_t>(low), up);
+    return range(rng);
+}
+
+// Additional overload for size_t to uint32_t conversion
+inline auto random(int low, std::size_t up) -> std::uint32_t {
+    std::uniform_int_distribution<std::uint32_t> range(static_cast<std::uint32_t>(low), static_cast<std::uint32_t>(up));
+    return range(rng);
+}
 
 template <class Integral1, class Integral2>
 auto random(Integral1 low, Integral2 up) -> Integral2 {
@@ -191,6 +203,9 @@ template <class String>
 void arena_clause11_21_4_2_g(String& test) {
     // Constructor from size_t, char
     const size_t n = random(0, test.size());
+    if (test.empty()) {
+        return;
+    }
     const auto c = test.front();
     test = String(n, c, test.get_allocator());
 }
@@ -1944,7 +1959,6 @@ void arena_clause11_21_4_8_9_a(String& test) {
     }
 }
 
-
 TEST_CASE("string::testAllClauses") {
     std::cout << "Starting with seed: " << seed << std::endl;
     std::string r;
@@ -3419,7 +3433,7 @@ TEST_CASE("pmr_small_string::testAllClauses") {
     using pmr_small_string = pmr::small_string;
     std::cout << "Starting pmr_small_string tests with seed: " << seed << std::endl;
     // Arena arena(Arena::Options::GetDefaultOptions());
-    std::byte buffer[1024*64];
+    std::byte buffer[1024 * 64];
     std::pmr::monotonic_buffer_resource pool{buffer, sizeof(buffer)};
     std::string r;
     pmr_small_string c(&pool);
@@ -3657,7 +3671,7 @@ TEST_CASE("small_string_not_null_terminated::testAllClauses") {
 TEST_CASE("pmr_small_string::testAllClauses") {
     using pmr_small_byte_string = pmr::small_byte_string;
     std::cout << "Starting pmr_small_byte_string tests with seed: " << seed << std::endl;
-    std::byte buffer[1024*64];
+    std::byte buffer[1024 * 64];
     std::pmr::monotonic_buffer_resource pool{buffer, sizeof(buffer)};
     std::string r;
     pmr_small_byte_string c(&pool);

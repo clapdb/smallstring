@@ -17,7 +17,7 @@ cmake_minimum_required(VERSION 3.00)
 project(small)
 
 set(CMAKE_CXX_STANDARD 20)
-set(COMMON_WARNING_FLAGS "${COMMON_WARNING_FLAGS} -Wall -Werror -Wextra -Wendif-labels -Wshadow -Wunused-parameter -Wunused-variable  -Wparentheses -Wuninitialized -Wcomment -Wformat -Wimplicit-fallthrough -Wsign-conversion")
+set(COMMON_WARNING_FLAGS "${COMMON_WARNING_FLAGS} -Wall -Werror -Wextra -Wendif-labels -Wshadow -Wunused-parameter -Wunused-variable  -Wparentheses -Wuninitialized -Wcomment -Wformat -Wimplicit-fallthrough -Wsign-conversion -Wconversion")
 
 # Disable GCC's overly aggressive static analysis warnings in release builds
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

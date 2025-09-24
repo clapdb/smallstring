@@ -558,7 +558,7 @@ struct malloc_core
             case 2: {
                 // Median buffer, the size is stored in the buffer header, the idle_or_ignore is the idle size
                 set_size_to_buffer_header(new_size);
-                external.idle.idle_or_ignore = get_idle_capacity_from_buffer_header();
+                external.idle.idle_or_ignore = static_cast<uint16_t>(get_idle_capacity_from_buffer_header());
                 if constexpr (NullTerminated) {
                     // set the terminator
                     reinterpret_cast<Char*>(external.c_str_ptr)[new_size] = '\0';
@@ -1028,7 +1028,7 @@ class small_string_buffer
     [[nodiscard, gnu::always_inline]] constexpr static inline auto calculate_new_buffer_size(size_t size,
                                                                                              float growth) noexcept
       -> buffer_type_and_size<size_type> {
-        return calculate_new_buffer_size(size * growth);
+        return calculate_new_buffer_size(static_cast<size_t>(size * growth));
     }
 
     /**

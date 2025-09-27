@@ -164,7 +164,7 @@ TEST_CASE("smallstring capacity management") {
 
         // Fill up to reserved capacity
         for (int i = 0; i < 50; ++i) {
-            str.push_back('a' + (i % 26));
+            str.push_back(static_cast<char>('a' + (i % 26)));
         }
         CHECK(str.size() == 50);
         CHECK(str.capacity() >= 100);

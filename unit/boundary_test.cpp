@@ -85,8 +85,8 @@ TEST_CASE("smallstring boundary transitions") {
         auto prev_capacity = str.capacity();
 
         // Track capacity changes as we grow
-        for (int i = 0; i < 20; ++i) {
-            str += ('a' + (i % 26));
+        for (auto i = 0u; i < 20u; ++i) {
+            str += static_cast<char>('a' + (i % 26u));
             auto current_capacity = str.capacity();
 
             // Capacity should never decrease during growth
@@ -115,7 +115,7 @@ TEST_CASE("smallstring boundary transitions") {
 
         // Fill to verify it works
         while (str.size() < 10) {
-            str += ('a' + (str.size() % 26));
+            str += static_cast<char>('a' + (str.size() % 26));
         }
         CHECK(str.size() == 10);
     }

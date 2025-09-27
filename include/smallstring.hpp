@@ -342,9 +342,9 @@ struct malloc_core
      */
     [[nodiscard, gnu::always_inline]] constexpr auto max_real_cap_from_buffer_header() const noexcept -> size_type {
         if constexpr (NullTerminated) {
-            return capacity_from_buffer_header() - 1 - sizeof(struct capacity_and_size<size_type>);
+            return capacity_from_buffer_header() - 1U - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
         } else {
-            return capacity_from_buffer_header() - sizeof(struct capacity_and_size<size_type>);
+            return capacity_from_buffer_header() - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
         }
     }
 
@@ -433,9 +433,9 @@ struct malloc_core
         Assert(capacity_from_buffer_header() > 256, "the capacity should be more than 256");
         auto [cap, size] = get_capacity_and_size_from_buffer_header();
         if constexpr (NullTerminated) {
-            return cap - size - 1 - sizeof(struct capacity_and_size<size_type>);
+            return cap - size - 1U - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
         } else {
-            return cap - size - sizeof(struct capacity_and_size<size_type>);
+            return cap - size - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
         }
     }
 
@@ -456,9 +456,9 @@ struct malloc_core
                 Assert(external.cap_size.cap <= 32, "the cap should be no more than 32");
                 Assert(external.cap_size.size <= 256, "the size should be no more than 256");
                 if constexpr (NullTerminated) {
-                    return (external.cap_size.cap + 1UL) * 8UL - external.cap_size.size - 1UL;
+                    return (external.cap_size.cap + 1U) * 8U - external.cap_size.size - 1U;
                 } else {
-                    return (external.cap_size.cap + 1UL) * 8UL - external.cap_size.size;
+                    return (external.cap_size.cap + 1U) * 8U - external.cap_size.size;
                 }
             }
             case 2:  // median
@@ -487,15 +487,15 @@ struct malloc_core
                 return internal_buffer_size();
             case 1:
                 if constexpr (NullTerminated) {
-                    return (external.cap_size.cap + 1UL) * 8UL - 1UL;
+                    return (external.cap_size.cap + 1U) * 8U - 1U;
                 } else {
-                    return (external.cap_size.cap + 1UL) * 8UL;
+                    return (external.cap_size.cap + 1U) * 8U;
                 }
             default:
                 if constexpr (NullTerminated) {
-                    return capacity_from_buffer_header() - 1 - sizeof(struct capacity_and_size<size_type>);
+                    return capacity_from_buffer_header() - 1U - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
                 } else {
-                    return capacity_from_buffer_header() - sizeof(struct capacity_and_size<size_type>);
+                    return capacity_from_buffer_header() - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
                 }
         }
     }
@@ -533,6 +533,8 @@ struct malloc_core
      */
     constexpr void set_size_and_idle_and_set_term(size_type new_size) noexcept {
         auto flag = external.idle.flag;
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wconversion"
         switch (flag) {
             case 0: {
                 // Internal buffer, the size is stored in the internal_core
@@ -573,6 +575,7 @@ struct malloc_core
                 }
             }
         }
+        #pragma GCC diagnostic pop
     }
 
     /**
@@ -584,6 +587,8 @@ struct malloc_core
      */
     constexpr void increase_size_and_idle_and_set_term(size_type size_to_increase) noexcept {
         auto flag = external.idle.flag;
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wconversion"
         switch (flag) {
             case 0:
                 Assert(internal.internal_size + size_to_increase <= internal_buffer_size(),
@@ -617,6 +622,7 @@ struct malloc_core
                 }
                 break;
             }
+        #pragma GCC diagnostic pop
         }
     }
 
@@ -628,6 +634,8 @@ struct malloc_core
      * @note Adds null termination at new end position
      */
     constexpr void decrease_size_and_idle_and_set_term(size_type size_to_decrease) noexcept {
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wconversion"
         auto flag = external.idle.flag;
         switch (flag) {
             case 0:
@@ -665,6 +673,7 @@ struct malloc_core
                 break;
             }
         }
+        #pragma GCC diagnostic pop
     }
 
     [[nodiscard]] constexpr auto get_capacity_and_size() const noexcept -> capacity_and_size<size_type> {
@@ -685,9 +694,9 @@ struct malloc_core
                 auto [cap, size] = get_capacity_and_size_from_buffer_header();
                 size_type real_cap;
                 if constexpr (NullTerminated) {
-                    real_cap = cap - 1 - sizeof(struct capacity_and_size<size_type>);
+                    real_cap = cap - 1U - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
                 } else {
-                    real_cap = cap - sizeof(struct capacity_and_size<size_type>);
+                    real_cap = cap - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
                 }
                 return {.capacity = real_cap, .size = size};
             }
@@ -914,11 +923,11 @@ class small_string_buffer
         if constexpr (NullTerminated) {
             Assert(buffer_size >= sizeof(struct capacity_and_size<size_type>) + 1 + old_size,
                    "the buffer_size should be no less than the size of the buffer header and the old size");
-            return buffer_size - sizeof(struct capacity_and_size<size_type>) - 1 - old_size;
+            return buffer_size - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>)) - 1 - old_size;
         } else {
             Assert(buffer_size >= sizeof(struct capacity_and_size<size_type>) + old_size,
                    "the buffer_size should be no less than the size of the buffer header and the old size");
-            return buffer_size - sizeof(struct capacity_and_size<size_type>) - old_size;
+            return buffer_size - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>)) - old_size;
         }
     }
 
@@ -936,6 +945,9 @@ class small_string_buffer
         // make sure the old_str_size <= new_buffer_size
         auto type = type_and_size.core_type;
         auto new_buffer_size = type_and_size.buffer_size;
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wconversion"
+
 
         switch (type) {
             case CoreType::Internal: {
@@ -982,6 +994,7 @@ class small_string_buffer
                 head->size = old_str_size;
                 return {.c_str_ptr = reinterpret_cast<int64_t>(head + 1),
                         .idle = {.idle_or_ignore = 0, .flag = kIsLong}};
+                #pragma GCC diagnostic pop
             }
             default:
                 __builtin_unreachable();
@@ -1048,6 +1061,8 @@ class small_string_buffer
     constexpr void initial_allocate(buffer_type_and_size<size_type> cap_and_type, size_type size) noexcept {
         auto type = cap_and_type.core_type;
         auto new_buffer_size = cap_and_type.buffer_size;
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wconversion"
         switch (type) {
             case CoreType::Internal:
                 _core.internal.flag = kIsInternal;
@@ -1108,6 +1123,7 @@ class small_string_buffer
                 _core.external = {.c_str_ptr = reinterpret_cast<int64_t>(head + 1),
                                   .idle = {.idle_or_ignore = 0, .flag = kIsLong}};
                 break;
+                #pragma GCC diagnostic pop
             }
         }
         return;

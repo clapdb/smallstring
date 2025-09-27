@@ -17,7 +17,7 @@ cmake_minimum_required(VERSION 3.00)
 project(small)
 
 set(CMAKE_CXX_STANDARD 20)
-set(COMMON_WARNING_FLAGS "${COMMON_WARNING_FLAGS} -Wall -Werror -Wextra -Wendif-labels -Wshadow -Wunused-parameter -Wunused-variable  -Wparentheses -Wuninitialized -Wcomment -Wformat -Wimplicit-fallthrough -Wsign-conversion")
+set(COMMON_WARNING_FLAGS "${COMMON_WARNING_FLAGS} -Wall -Werror -Wextra -Wendif-labels -Wshadow -Wunused-parameter -Wunused-variable  -Wparentheses -Wuninitialized -Wcomment -Wformat -Wimplicit-fallthrough -Wsign-conversion -Wconversion")
 
 # Disable GCC's overly aggressive static analysis warnings in release builds
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -30,8 +30,18 @@ set(CMAKE_CXX_EXTENSIONS ON)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+# Fix pthread support for Clang
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+    set(CMAKE_THREAD_LIBS_INIT "-pthread")
+    set(CMAKE_HAVE_THREADS_LIBRARY 1)
+    set(CMAKE_USE_WIN32_THREADS_INIT 0)
+    set(CMAKE_USE_PTHREADS_INIT 1)
+    set(THREADS_FOUND TRUE)
+endif()
+
 # sanitizer
-set(SANITIZE_PARAM "-fsanitize=address -fsanitize=undefined -fsanitize=bounds -fno-sanitize=vptr -fno-omit-frame-pointer")  # param from seastar.pc
+set(SANITIZE_PARAM "-fsanitize=address -fsanitize=undefined -fsanitize=bounds -fno-sanitize=vptr -fno-omit-frame-pointer")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${SANITIZE_PARAM}")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${SANITIZE_PARAM}")
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} ${SANITIZE_PARAM}")

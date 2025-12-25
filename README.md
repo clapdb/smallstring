@@ -21,6 +21,11 @@ A memory-efficient C++20 header-only string library optimized for minimal memory
 - **Zero-cost moves** for internal storage strings
 - **Perfect for modern C++ idioms** (RAII, move-only types, etc.)
 
+### 🔍 Transparent Lookup Support
+- **Heterogeneous lookup** - find keys using `string_view` without constructing `small_string`
+- **~14% faster unordered_map lookups vs regular `small_string`** with transparent comparators
+- **Zero-allocation lookups** - no temporary string construction
+
 ### 🏗️ Smart Storage Strategy
 SmallString automatically chooses optimal storage based on string size, providing seamless performance across different string lengths without requiring developer intervention.
 
@@ -46,11 +51,12 @@ SmallString automatically chooses optimal storage based on string size, providin
 
 ### ✅ Good Use Cases
 ```cpp
-// Hash maps - critical memory savings due to empty slot overhead
-std::unordered_map<small::small_string, ValueType> lookup_table;
-// Hash maps waste ~20% slots as empty - SmallString reduces this waste significantly
-// std::string: ~32 bytes per slot (including empty ones)  
-// small_string: ~8 bytes per slot = 4x memory reduction
+// Hash maps with transparent lookup - optimal for key lookups
+std::unordered_map<small::small_string, ValueType,
+                   small::transparent_string_hash,
+                   small::transparent_string_equal> lookup_table;
+// Lookup with string_view - no small_string construction needed
+auto it = lookup_table.find(std::string_view("key"));
 
 // Large string collections in data processing
 std::vector<small::small_string> tokens(1000000);  // Saves ~24MB vs std::string
@@ -59,10 +65,10 @@ std::vector<small::small_string> tokens(1000000);  // Saves ~24MB vs std::string
 std::unordered_set<small::small_string> string_pool;  // Memory-efficient string deduplication
 
 // Database-like applications with many string keys
-std::map<small::small_string, RecordType> database_index;  // Tree nodes use less memory
+std::map<small::small_string, RecordType, small::transparent_string_less> database_index;
 
-// Memory-constrained environments
-// Embedded systems, memory pools, real-time systems
+// Memory-constrained environments (AWS Lambda, embedded systems)
+// Billed by memory usage - SmallString provides 4x memory reduction
 ```
 
 ### ❌ Avoid When
@@ -144,6 +150,40 @@ small::pmr::small_string managed_string(&pool);
 managed_string = "Uses custom memory pool";
 ```
 
+### Transparent Lookup (Heterogeneous Lookup)
+
+Transparent comparators enable lookups using `string_view` without constructing a `small_string`, providing **~15% faster lookups compared to regular small_string-based lookups**:
+
+```cpp
+#include "smallstring.hpp"
+#include <unordered_map>
+#include <map>
+
+// For unordered containers: use transparent_string_hash and transparent_string_equal
+std::unordered_map<small::small_string, int,
+                   small::transparent_string_hash,
+                   small::transparent_string_equal> hash_map;
+
+hash_map["key1"] = 1;
+hash_map["key2"] = 2;
+
+// Lookup with string_view - no small_string construction!
+std::string_view search_key = "key1";
+auto it = hash_map.find(search_key);  // ~14-15% faster than non-transparent small_string lookup
+
+// Also works with const char* and std::string
+auto it2 = hash_map.find("key2");
+
+// For ordered containers: use transparent_string_less
+std::map<small::small_string, int, small::transparent_string_less> ordered_map;
+
+ordered_map["alpha"] = 1;
+ordered_map["beta"] = 2;
+
+// Transparent lookup in ordered map
+auto it3 = ordered_map.find(std::string_view("alpha"));
+```
+
 ## 🏗️ Building
 
 Header-only library - just include:
@@ -169,7 +209,26 @@ ninja reg_test    # Regression testing (borrowed from Folly)
 | `small::small_string` | 8 bytes | ~8MB | Memory constrained |
 | `small::pmr::small_string` | 16 bytes | ~16MB | Custom allocation |
 
-For detailed performance benchmarks, see [bench/README.md](bench/README.md).
+## ⚡ Performance Benchmarks
+
+Measured on AMD Ryzen 7 5800X @ 4.8GHz, GCC 14, -O3 -march=native:
+
+| Operation | std::string | small_string | Comparison |
+|-----------|-------------|--------------|------------|
+| Small Construct (≤7 chars) | 2.59 ns | **2.36 ns** | **9% faster** |
+| Large Construct (64 chars) | 16.0 ns | 17.2 ns | 8% slower |
+| Small Copy | 2.58 ns | 3.24 ns | 26% slower |
+| Large Copy | 15.1 ns | 17.8 ns | 18% slower |
+| Map Lookup | 83 μs | 105 μs | 26% slower |
+| UnorderedMap Lookup | 20 μs | 29 μs | 45% slower |
+| **Transparent Lookup** | 20 μs | **25 μs** | **25% slower** (vs 45% non-transparent) |
+
+**Key Insights:**
+- Small string construction is **faster** than `std::string`
+- Transparent lookup reduces the unordered_map performance gap from **45% to 25%** (~40% relative improvement)
+- Memory savings of **4x** often outweigh the performance cost
+
+For detailed benchmarks, see [bench/README.md](bench/README.md).
 
 ## 🛠️ API Reference
 
@@ -179,11 +238,28 @@ For detailed performance benchmarks, see [bench/README.md](bench/README.md).
 // Standard version (8 bytes)
 using small::small_string = basic_small_string<char>;
 
-// PMR version (16 bytes) 
+// PMR version (16 bytes)
 using small::pmr::small_string = basic_small_string<char, ..., std::pmr::polymorphic_allocator<char>>;
 
 // Binary data version (no null termination)
 using small::small_byte_string = basic_small_string<char, ..., false>;
+```
+
+### Transparent Comparators
+
+```cpp
+// For std::unordered_map/std::unordered_set - enables heterogeneous lookup
+small::transparent_string_hash   // Hash functor with is_transparent
+small::transparent_string_equal  // Equality functor with is_transparent
+
+// For std::map/std::set - enables heterogeneous lookup
+small::transparent_string_less   // Less-than functor with is_transparent
+
+// Usage:
+std::unordered_map<small::small_string, int,
+                   small::transparent_string_hash,
+                   small::transparent_string_equal> map;
+map.find(std::string_view("key"));  // No small_string construction
 ```
 
 ### Additional Methods
@@ -194,6 +270,9 @@ uint8_t storage_type = str.get_core_type();
 
 // Full std::string compatibility
 std::string_view view = str;  // Implicit conversion
+
+// Efficient string_view access (single switch for ptr+size)
+auto sv = str.get_string_view();
 ```
 
 ## 💼 Real-World Applications

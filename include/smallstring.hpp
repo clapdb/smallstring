@@ -449,26 +449,27 @@ struct malloc_core
      */
     [[nodiscard, gnu::always_inline]] constexpr auto idle_capacity() const noexcept -> size_type {
         auto flag = external.idle.flag;
-        switch (flag) {
-            case 0:  // internal
-                return internal_buffer_size() - internal.internal_size;
-            case 1: {  // short
-                Assert(external.cap_size.cap <= 32, "the cap should be no more than 32");
-                Assert(external.cap_size.size <= 256, "the size should be no more than 256");
-                if constexpr (NullTerminated) {
-                    return (external.cap_size.cap + 1U) * 8U - external.cap_size.size - 1U;
-                } else {
-                    return (external.cap_size.cap + 1U) * 8U - external.cap_size.size;
+        // Fast path: Internal (0), Short (1), and Median (2) are direct field accesses
+        if (flag <= 2) [[likely]] {
+            switch (flag) {
+                case 0:  // internal
+                    return internal_buffer_size() - internal.internal_size;
+                case 1: {  // short
+                    Assert(external.cap_size.cap <= 32, "the cap should be no more than 32");
+                    Assert(external.cap_size.size <= 256, "the size should be no more than 256");
+                    if constexpr (NullTerminated) {
+                        return (external.cap_size.cap + 1U) * 8U - external.cap_size.size - 1U;
+                    } else {
+                        return (external.cap_size.cap + 1U) * 8U - external.cap_size.size;
+                    }
                 }
+                default:  // case 2: median - idle is cached in the core
+                    return external.idle.idle_or_ignore;
             }
-            case 2:  // median
-                return external.idle.idle_or_ignore;
-            case 3:  // long
-                return get_idle_capacity_from_buffer_header();
-            default:
-                Assert(false, "the flag should be just 01-03");
-                __builtin_unreachable();
         }
+        // Slow path: Long (3) requires memory indirection
+        Assert(flag == 3, "the flag should be 3 for long");
+        return get_idle_capacity_from_buffer_header();
     }
 
     /**
@@ -482,21 +483,23 @@ struct malloc_core
      */
     [[nodiscard, gnu::always_inline]] constexpr auto capacity() const noexcept -> size_type {
         auto flag = external.idle.flag;
-        switch (flag) {
-            case 0:
+        // Fast path: Internal (0) and Short (1) are direct field accesses
+        if (flag <= 1) [[likely]] {
+            if (flag == 0) {
                 return internal_buffer_size();
-            case 1:
-                if constexpr (NullTerminated) {
-                    return (external.cap_size.cap + 1U) * 8U - 1U;
-                } else {
-                    return (external.cap_size.cap + 1U) * 8U;
-                }
-            default:
-                if constexpr (NullTerminated) {
-                    return capacity_from_buffer_header() - 1U - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
-                } else {
-                    return capacity_from_buffer_header() - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
-                }
+            }
+            // Short storage
+            if constexpr (NullTerminated) {
+                return (external.cap_size.cap + 1U) * 8U - 1U;
+            } else {
+                return (external.cap_size.cap + 1U) * 8U;
+            }
+        }
+        // Slow path: Median/Long require memory indirection
+        if constexpr (NullTerminated) {
+            return capacity_from_buffer_header() - 1U - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
+        } else {
+            return capacity_from_buffer_header() - static_cast<size_type>(sizeof(struct capacity_and_size<size_type>));
         }
     }
 
@@ -508,17 +511,18 @@ struct malloc_core
      * @note For short storage: reads from cap_size.size field
      * @note For median/long storage: reads from buffer header
      * @note Size excludes null termination character
+     * @note Optimized with fast path for Internal/Short (direct field access)
      */
     [[nodiscard, gnu::always_inline]] constexpr auto size() const noexcept -> size_type {
         auto flag = external.idle.flag;
-        switch (flag) {
-            case 0:
-                return internal.internal_size;
-            case 1:
-                return external.cap_size.size;
-            default:
-                return size_from_buffer_header();
+        // Fast path: Internal (0) and Short (1) are direct field accesses
+        if (flag <= 1) [[likely]] {
+            // Conditional select between internal_size and cap_size.size (compiles to cmov)
+            // When flag==0: use internal_size, when flag==1: use cap_size.size
+            return flag == 0 ? internal.internal_size : external.cap_size.size;
         }
+        // Slow path: Median/Long require memory indirection
+        return size_from_buffer_header();
     }
 
     /**
@@ -704,14 +708,20 @@ struct malloc_core
     }
 
     /**
-     * @brief Returns pointer to beginning of string data
+     * @brief Returns pointer to beginning of string data (branchless version)
      * @return Mutable pointer to first character of string
      * @note For internal storage: points to embedded data array
      * @note For external storage: points to heap-allocated buffer
      * @note Always points to actual character data, not buffer header
+     * @note Uses branchless selection for better performance with unpredictable access patterns
      */
     [[nodiscard, gnu::always_inline]] inline auto begin_ptr() noexcept -> Char* {
-        return is_external() ? reinterpret_cast<Char*>(external.c_str_ptr) : internal.data;
+        auto flag = internal.flag;
+        // Branchless select: flag == 0 means internal, otherwise external
+        uintptr_t int_addr = reinterpret_cast<uintptr_t>(internal.data);
+        uintptr_t ext_addr = reinterpret_cast<uintptr_t>(reinterpret_cast<Char*>(external.c_str_ptr));
+        uintptr_t mask = -uintptr_t(flag == 0);  // All 1s if internal, all 0s if external
+        return reinterpret_cast<Char*>((int_addr & mask) | (ext_addr & ~mask));
     }
 
     [[nodiscard, gnu::always_inline]] inline auto get_string_view() const noexcept -> std::string_view {
@@ -723,6 +733,28 @@ struct malloc_core
                 return std::string_view{reinterpret_cast<Char*>(external.c_str_ptr), external.cap_size.size};
             default:
                 return std::string_view{reinterpret_cast<Char*>(external.c_str_ptr), size_from_buffer_header()};
+        }
+    }
+
+    /**
+     * @brief Returns both begin and end pointers in a single operation
+     * @return Pair of (begin_ptr, end_ptr) for efficient iteration setup
+     * @note Single switch statement to get both pointers, reducing branch overhead
+     * @note Prefer this over separate begin_ptr()/end_ptr() calls when both are needed
+     */
+    [[nodiscard, gnu::always_inline]] constexpr auto begin_end_ptr() noexcept -> std::pair<Char*, Char*> {
+        auto flag = internal.flag;
+        switch (flag) {
+            case 0:
+                return {internal.data, &internal.data[internal.internal_size]};
+            case 1: {
+                auto ptr = reinterpret_cast<Char*>(external.c_str_ptr);
+                return {ptr, ptr + external.cap_size.size};
+            }
+            default: {
+                auto ptr = reinterpret_cast<Char*>(external.c_str_ptr);
+                return {ptr, ptr + size_from_buffer_header()};
+            }
         }
     }
 
@@ -3669,12 +3701,14 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param other String to compare with
      * @return Negative value if this < other, 0 if equal, positive if this > other
      * @note Standard three-way comparison semantics
+     * @note Optimized to use get_string_view() for single-switch access to ptr+size
      */
     [[nodiscard]] constexpr auto compare(const basic_small_string& other) const noexcept -> int {
-        auto this_size = size();
-        auto other_size = other.size();
-        auto r = traits_type::compare(data(), other.data(), std::min(this_size, other_size));
-        return r != 0 ? r : this_size > other_size ? 1 : this_size < other_size ? -1 : 0;
+        // Use get_string_view() to get ptr+size in one switch instead of separate data()+size() calls
+        auto lhs = buffer_type::get_string_view();
+        auto rhs = other.get_string_view();
+        auto r = traits_type::compare(lhs.data(), rhs.data(), std::min(lhs.size(), rhs.size()));
+        return r != 0 ? r : lhs.size() > rhs.size() ? 1 : lhs.size() < rhs.size() ? -1 : 0;
     }
     /**
      * @brief Compares substring of this string with another string
@@ -5522,6 +5556,76 @@ auto to_small_string(std::string_view view, std::pmr::polymorphic_allocator<char
 }
 
 }  // namespace small::pmr
+
+namespace small {
+
+/**
+ * @brief Transparent hash functor for heterogeneous lookup in unordered containers
+ * @note Enables lookup with string_view without constructing small_string
+ * @note Use with std::unordered_map<small_string, V, transparent_string_hash, transparent_string_equal>
+ * @example
+ *   std::unordered_map<small_string, int, small::transparent_string_hash, small::transparent_string_equal> map;
+ *   map["key"] = 1;
+ *   auto it = map.find(std::string_view("key"));  // No small_string construction
+ */
+struct transparent_string_hash {
+    using is_transparent = void;  ///< Enable heterogeneous lookup
+
+    [[nodiscard]] auto operator()(std::string_view sv) const noexcept -> std::size_t {
+        return std::hash<std::string_view>{}(sv);
+    }
+
+    [[nodiscard]] auto operator()(const std::string& s) const noexcept -> std::size_t {
+        return std::hash<std::string_view>{}(s);
+    }
+
+    [[nodiscard]] auto operator()(const char* s) const noexcept -> std::size_t {
+        return std::hash<std::string_view>{}(s);
+    }
+
+    template <typename Char,
+              template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
+              template <typename, bool> class Core, class Traits, class Allocator, bool NullTerminated, float Growth>
+    [[nodiscard]] auto operator()(
+      const basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated, Growth>& str) const noexcept
+      -> std::size_t {
+        return std::hash<std::string_view>{}(str);
+    }
+};
+
+/**
+ * @brief Transparent equality functor for heterogeneous lookup in unordered containers
+ * @note Enables equality comparison between small_string and string_view
+ * @note Use with std::unordered_map<small_string, V, transparent_string_hash, transparent_string_equal>
+ */
+struct transparent_string_equal {
+    using is_transparent = void;  ///< Enable heterogeneous lookup
+
+    template <typename T1, typename T2>
+    [[nodiscard]] auto operator()(const T1& lhs, const T2& rhs) const noexcept -> bool {
+        return std::string_view(lhs) == std::string_view(rhs);
+    }
+};
+
+/**
+ * @brief Transparent less-than functor for heterogeneous lookup in ordered containers
+ * @note Enables lookup with string_view without constructing small_string
+ * @note Use with std::map<small_string, V, transparent_string_less>
+ * @example
+ *   std::map<small_string, int, small::transparent_string_less> map;
+ *   map["key"] = 1;
+ *   auto it = map.find(std::string_view("key"));  // No small_string construction
+ */
+struct transparent_string_less {
+    using is_transparent = void;  ///< Enable heterogeneous lookup
+
+    template <typename T1, typename T2>
+    [[nodiscard]] auto operator()(const T1& lhs, const T2& rhs) const noexcept -> bool {
+        return std::string_view(lhs) < std::string_view(rhs);
+    }
+};
+
+}  // namespace small
 
 namespace std {
 

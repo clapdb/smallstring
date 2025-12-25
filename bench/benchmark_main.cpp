@@ -770,16 +770,55 @@ BENCHMARK_F(BenchmarkFixture, SmallByteString_UnorderedMapLookup)(benchmark::Sta
     std::unordered_map<small::small_byte_string, int> map;
     std::vector<small::small_byte_string> keys;
     keys.reserve(short_strings.size());
-    
+
     for (size_t i = 0; i < short_strings.size(); ++i) {
         small::small_byte_string key(short_strings[i]);
         map.emplace(key, static_cast<int>(i));
         keys.push_back(key);
     }
-    
+
     for (auto _ : state) {
         for (const auto& key : keys) {
             auto it = map.find(key);
+            benchmark::DoNotOptimize(it);
+        }
+    }
+}
+
+// Transparent lookup benchmarks - lookup using string_view without constructing small_string
+BENCHMARK_F(BenchmarkFixture, SmallString_UnorderedMapLookupTransparent)(benchmark::State& state) {
+    std::unordered_map<small::small_string, int, small::transparent_string_hash, small::transparent_string_equal> map;
+    std::vector<std::string_view> keys;
+    keys.reserve(short_strings.size());
+
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        small::small_string key(short_strings[i]);
+        map.emplace(key, static_cast<int>(i));
+        keys.push_back(short_strings[i]);  // Store string_view for lookup
+    }
+
+    for (auto _ : state) {
+        for (const auto& key : keys) {
+            auto it = map.find(key);  // Lookup using string_view
+            benchmark::DoNotOptimize(it);
+        }
+    }
+}
+
+BENCHMARK_F(BenchmarkFixture, SmallByteString_UnorderedMapLookupTransparent)(benchmark::State& state) {
+    std::unordered_map<small::small_byte_string, int, small::transparent_string_hash, small::transparent_string_equal> map;
+    std::vector<std::string_view> keys;
+    keys.reserve(short_strings.size());
+
+    for (size_t i = 0; i < short_strings.size(); ++i) {
+        small::small_byte_string key(short_strings[i]);
+        map.emplace(key, static_cast<int>(i));
+        keys.push_back(short_strings[i]);  // Store string_view for lookup
+    }
+
+    for (auto _ : state) {
+        for (const auto& key : keys) {
+            auto it = map.find(key);  // Lookup using string_view
             benchmark::DoNotOptimize(it);
         }
     }

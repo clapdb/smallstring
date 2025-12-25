@@ -719,7 +719,7 @@ struct malloc_core
         auto flag = internal.flag;
         // Branchless select: flag == 0 means internal, otherwise external
         uintptr_t int_addr = reinterpret_cast<uintptr_t>(internal.data);
-        uintptr_t ext_addr = static_cast<uintptr_t>(external.c_str_ptr);
+        uintptr_t ext_addr = reinterpret_cast<uintptr_t>(reinterpret_cast<Char*>(external.c_str_ptr));
         uintptr_t mask = -uintptr_t(flag == 0);  // All 1s if internal, all 0s if external
         return reinterpret_cast<Char*>((int_addr & mask) | (ext_addr & ~mask));
     }

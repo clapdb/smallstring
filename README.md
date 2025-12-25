@@ -23,7 +23,7 @@ A memory-efficient C++20 header-only string library optimized for minimal memory
 
 ### 🔍 Transparent Lookup Support
 - **Heterogeneous lookup** - find keys using `string_view` without constructing `small_string`
-- **15% faster unordered_map lookups** with transparent comparators
+- **~14% faster unordered_map lookups vs regular `small_string`** with transparent comparators
 - **Zero-allocation lookups** - no temporary string construction
 
 ### 🏗️ Smart Storage Strategy
@@ -152,7 +152,7 @@ managed_string = "Uses custom memory pool";
 
 ### Transparent Lookup (Heterogeneous Lookup)
 
-Transparent comparators enable lookups using `string_view` without constructing a `small_string`, providing **15% faster lookups**:
+Transparent comparators enable lookups using `string_view` without constructing a `small_string`, providing **~15% faster lookups compared to regular small_string-based lookups**:
 
 ```cpp
 #include "smallstring.hpp"
@@ -169,7 +169,7 @@ hash_map["key2"] = 2;
 
 // Lookup with string_view - no small_string construction!
 std::string_view search_key = "key1";
-auto it = hash_map.find(search_key);  // 15% faster than regular lookup
+auto it = hash_map.find(search_key);  // ~14-15% faster than non-transparent small_string lookup
 
 // Also works with const char* and std::string
 auto it2 = hash_map.find("key2");

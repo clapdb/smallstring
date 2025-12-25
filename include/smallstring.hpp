@@ -517,7 +517,7 @@ struct malloc_core
         auto flag = external.idle.flag;
         // Fast path: Internal (0) and Short (1) are direct field accesses
         if (flag <= 1) [[likely]] {
-            // Branchless select between internal_size and cap_size.size
+            // Conditional select between internal_size and cap_size.size (compiles to cmov)
             // When flag==0: use internal_size, when flag==1: use cap_size.size
             return flag == 0 ? internal.internal_size : external.cap_size.size;
         }

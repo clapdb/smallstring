@@ -221,11 +221,11 @@ Measured on AMD Ryzen 7 5800X @ 4.8GHz, GCC 14, -O3 -march=native:
 | Large Copy | 15.1 ns | 17.8 ns | 18% slower |
 | Map Lookup | 83 μs | 105 μs | 26% slower |
 | UnorderedMap Lookup | 20 μs | 29 μs | 45% slower |
-| **Transparent Lookup** | 20 μs | **25 μs** | **only 25% slower** |
+| **Transparent Lookup** | 20 μs | **25 μs** | **25% slower** (vs 45% non-transparent) |
 
 **Key Insights:**
 - Small string construction is **faster** than `std::string`
-- Transparent lookup reduces the performance gap by **~40%**
+- Transparent lookup reduces the unordered_map performance gap from **45% to 25%** (~40% relative improvement)
 - Memory savings of **4x** often outweigh the performance cost
 
 For detailed benchmarks, see [bench/README.md](bench/README.md).

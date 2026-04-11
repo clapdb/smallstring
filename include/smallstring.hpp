@@ -1551,8 +1551,8 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param allocator Different allocator to use for the copy
      * @note Creates copy using specified allocator instead of other's allocator
      */
-    constexpr basic_small_string(const basic_small_string& other, [[maybe_unused]] const Allocator& allocator)
-        : basic_small_string(initialized_later{}, other.size(), other.get_allocator()) {
+    constexpr basic_small_string(const basic_small_string& other, const Allocator& allocator)
+        : basic_small_string(initialized_later{}, other.size(), allocator) {
         std::memcpy(data(), other.data(), other.size());
     }
 

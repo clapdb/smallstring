@@ -13,7 +13,6 @@
  */
 
 #pragma once
-#include <fmt/format.h>
 #include <sys/types.h>
 
 #include <cassert>
@@ -30,6 +29,11 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+
+#ifndef STDB_FMT_IMPORTED
+#define STDB_FMT_IMPORTED 1
+import fmt;
+#endif
 
 namespace small {
 #ifndef Assert
@@ -5450,13 +5454,19 @@ template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
           template <typename, bool> class Core, class Traits, class Allocator, bool NullTerminated, float Growth>
 struct fmt::formatter<small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated, Growth>>
-    : fmt::formatter<std::string_view>
 {
-    using fmt::formatter<std::string_view>::parse;
+    constexpr auto parse(fmt::format_parse_context& ctx) -> fmt::format_parse_context::iterator {
+        auto it = ctx.begin();
+        const auto end = ctx.end();
+        while (it != end && *it != '}') {
+            ++it;
+        }
+        return it;
+    }
 
     auto format(const small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated>& str,
                 fmt::format_context& ctx) const noexcept {
-        return fmt::formatter<std::string_view>::format({str.data(), str.size()}, ctx);
+        return fmt::format_to(ctx.out(), "{}", std::string_view{str.data(), str.size()});
     }
 };
 

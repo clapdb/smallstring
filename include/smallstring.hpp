@@ -30,9 +30,16 @@
 #include <type_traits>
 #include <utility>
 
+// fmt comes in as a C++20 module only when the consumer asked for it (STDB_USE_FMT_MODULE, off by
+// default). Unconditionally importing it made this header unusable in any build where fmt is an
+// ordinary library -- "fatal error: module 'fmt' not found".
+#if defined(STDB_USE_FMT_MODULE)
 #ifndef STDB_FMT_IMPORTED
 #define STDB_FMT_IMPORTED 1
 import fmt;
+#endif
+#else
+#include <fmt/format.h>
 #endif
 
 namespace small {

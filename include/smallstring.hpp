@@ -24,6 +24,24 @@
 // in that module's GMF instead.
 #if defined(SMALLSTRING_USE_MODULE) && !defined(SMALLSTRING_MODULE_INTERFACE)
 
+// fmt as well, not just the import. This header has always made <fmt/format.h> visible to whoever
+// includes it, and plenty of code leans on that -- regression/string_test.cc includes only
+// smallstring.hpp and then calls fmt::format. The module cannot carry those declarations across: fmt
+// sits in its global module fragment and a GMF is not re-exported, so `import smallstring;` alone would
+// silently take fmt away from every consumer the moment SMALLSTRING_USE_MODULE is turned on.
+//
+// Keeping the include here costs nothing -- fmt is textual on both sides of the module boundary (or a
+// module on both sides, under STDB_USE_FMT_MODULE), so the declarations are the same entities either
+// way.
+#if defined(STDB_USE_FMT_MODULE)
+#ifndef STDB_FMT_IMPORTED
+#define STDB_FMT_IMPORTED 1
+import fmt;
+#endif
+#else
+#include <fmt/format.h>
+#endif
+
 import smallstring;
 
 #else

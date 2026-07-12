@@ -13,6 +13,22 @@
  */
 
 #pragma once
+// Owned by module `smallstring` when the consumer builds with modules (SMALLSTRING_USE_MODULE).
+//
+// Outside that module the include degrades to the import, so these declarations are not ALSO
+// re-declared in the global module. A header is textual everywhere or module-owned everywhere, never
+// both: mixing the two gives every type here two definitions, and nothing links.
+//
+// `import` is legal in a global module fragment, so a .cppm that reaches this header from its GMF is
+// fine. What is NOT fine is reaching it from inside an `export { }` block for the first time -- put it
+// in that module's GMF instead.
+#if defined(SMALLSTRING_USE_MODULE) && !defined(SMALLSTRING_MODULE_INTERFACE)
+
+import smallstring;
+
+#else
+
+#ifndef SMALLSTRING_MODULE_INTERFACE
 #include <sys/types.h>
 
 #include <cassert>
@@ -42,11 +58,16 @@ import fmt;
 #include <fmt/format.h>
 #endif
 
+#endif  // !SMALLSTRING_MODULE_INTERFACE
+
 namespace small {
 #ifndef Assert
 #define Assert(condition, message) assert((condition) && (message))
 #endif
-namespace {
+// Not an unnamed namespace: entities there have internal linkage, and a C++20 module interface
+// cannot reference an internal-linkage entity from an exported inline function or template
+// ("'kMinAlignSize' has internal linkage and cannot be referenced from an exported ...").
+namespace detail {
 inline constexpr uint64_t kMinAlignSize = 8;  // 64 bits for modern cpu
 /**
  * @brief Aligns a value up to the next multiple of N
@@ -65,7 +86,10 @@ template <uint64_t N>
     return (n + N - 1) & static_cast<uint64_t>(-N);
 }
 
-}  // namespace
+}  // namespace detail
+
+using detail::AlignUpTo;
+using detail::kMinAlignSize;
 
 /**
  * @brief Storage strategy enumeration for small string optimization
@@ -5668,3 +5692,5 @@ struct hash<small::basic_small_string<Char, Buffer, Core, Traits, Allocator, Nul
 };
 
 }  // namespace std
+
+#endif  // owned by module smallstring

@@ -68,17 +68,20 @@ import smallstring;
 #include <type_traits>
 #include <utility>
 
-// fmt comes in as a C++20 module only when the consumer asked for it (STDB_USE_FMT_MODULE, off by
-// default). Unconditionally importing it made this header unusable in any build where fmt is an
-// ordinary library -- "fatal error: module 'fmt' not found".
-#if defined(STDB_USE_FMT_MODULE)
-#ifndef STDB_FMT_IMPORTED
-#define STDB_FMT_IMPORTED 1
-import fmt;
-#endif
-#else
+// fmt is textual here, and stays textual even when the rest of the build has fmt as a C++20 module
+// (STDB_USE_FMT_MODULE). This is the branch that carries the *body*, so it is the branch that
+// *defines* fmt::formatter<basic_small_string> -- and that definition derives from
+// fmt::formatter<std::string_view>. Reached through `import fmt;`, that base resolves to fmt's
+// primary template and the header does not compile: "no member named 'parse' in
+// 'fmt::formatter<std::basic_string_view<char>>'", deleted constructor.
+//
+// (The import is fine in the SMALLSTRING_USE_MODULE branch above, and only there, because that
+// branch never parses this body -- the specialisation arrives ready-made from the module, and the
+// consumer needs nothing from fmt but its declarations.)
+//
+// Mixing this textual fmt with an imported fmt elsewhere in the program is exactly what
+// FMT_ATTACH_TO_GLOBAL_MODULE is for; smallstring.cppm requires it and explains why.
 #include <fmt/format.h>
-#endif
 
 #endif  // !SMALLSTRING_MODULE_INTERFACE
 

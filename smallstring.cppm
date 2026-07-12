@@ -15,6 +15,20 @@ module;
 #include SMALLSTRING_PRELUDE
 #endif
 
+// And that fallback needs <cassert> -- which is why this include is here rather than in the header.
+//
+// smallstring.hpp does include <cassert>, but only on its textual path: the module-interface path skips
+// the whole include block, and it has to, because it is read from inside an `export { }` block where a
+// first-time #include is not allowed. Its `#ifndef Assert` fallback still expands to assert(), though,
+// so with no SMALLSTRING_PRELUDE to define Assert the interface would not compile -- "use of undeclared
+// identifier 'assert'", once per call site. `import std.compat` cannot rescue it either: assert is a
+// macro, and macros do not cross a module boundary.
+//
+// So the fallback's dependency belongs here, next to the hook it backs. It is a macro, expanded while
+// this unit is preprocessed, so nothing about it reaches importers; <cassert> is just <assert.h>, and
+// carries none of the libstdc++ declarations the note below is about.
+#include <cassert>
+
 // std comes in as `import std.compat` below, NOT as textual libstdc++ headers here.
 //
 // Textual <stdexcept> in this fragment would bake libstdc++'s <string> declarations into the BMI as

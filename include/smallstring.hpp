@@ -13,7 +13,52 @@
  */
 
 #pragma once
+// smallstring reads fmt textually, always -- header-only, module consumer, module interface alike. It
+// never imports fmt, in any configuration.
+//
+// It can afford to be that blunt because fmt, if it is a module at all, has to be built with
+// FMT_ATTACH_TO_GLOBAL_MODULE: seastar reaches fmt through <fmt/format.h> in ~21 of its headers and
+// will keep doing so, so fmt's declarations must stay attached to the global module or nothing in the
+// tree links. That macro is precisely what makes textual and imported fmt the *same* entities ("you
+// can mix TUs with either importing or #including the {fmt} API" -- fmt's own words), so a textual
+// read here meets an imported fmt anywhere else in the program.
+//
+// The converse does not hold, which is why there is no `import fmt;` branch to balance this one: the
+// fmt::formatter<basic_small_string> specialisation below derives from fmt::formatter<std::string_view>,
+// and through an import that base resolves to fmt's *primary* template -- "no member named 'parse'",
+// deleted constructor. That is fmt's behaviour, not smallstring's (a TU that does nothing but
+// `import fmt;` and name fmt::formatter<std::string_view> fails identically), and it is why every
+// attempt to route this header's fmt through the module has been a bug.
+#if defined(STDB_USE_FMT_MODULE) && !defined(FMT_ATTACH_TO_GLOBAL_MODULE)
+#error "smallstring reads fmt textually and specialises fmt::formatter, so an fmt built as a C++20 module must be built with FMT_ATTACH_TO_GLOBAL_MODULE -- otherwise its declarations attach to module `fmt` and the textual ones here cannot match them."
+#endif
+
+// Owned by module `smallstring` when the consumer builds with modules (SMALLSTRING_USE_MODULE).
+//
+// Outside that module the include degrades to the import, so these declarations are not ALSO
+// re-declared in the global module. A header is textual everywhere or module-owned everywhere, never
+// both: mixing the two gives every type here two definitions, and nothing links.
+//
+// `import` is legal in a global module fragment, so a .cppm that reaches this header from its GMF is
+// fine. What is NOT fine is reaching it from inside an `export { }` block for the first time -- put it
+// in that module's GMF instead.
+#if defined(SMALLSTRING_USE_MODULE) && !defined(SMALLSTRING_MODULE_INTERFACE)
+
+// fmt as well, not just the import. This header has always made <fmt/format.h> visible to whoever
+// includes it, and plenty of code leans on that -- regression/string_test.cc includes only
+// smallstring.hpp and then calls fmt::format. The module cannot carry those declarations across: fmt
+// sits in its global module fragment and a GMF is not re-exported, so `import smallstring;` alone would
+// silently take fmt away from every consumer the moment SMALLSTRING_USE_MODULE is turned on.
+//
+// Keeping the include here costs nothing: it is the same <fmt/format.h> the interface unit read, and
+// under FMT_ATTACH_TO_GLOBAL_MODULE (see the top of this file) the same entities either way.
 #include <fmt/format.h>
+
+import smallstring;
+
+#else
+
+#ifndef SMALLSTRING_MODULE_INTERFACE
 #include <sys/types.h>
 
 #include <cassert>
@@ -31,11 +76,20 @@
 #include <type_traits>
 #include <utility>
 
+// This is the branch that carries the body, so it is the one that *defines* the formatter
+// specialisation -- the case the note at the top of this file is really about. Textual, always.
+#include <fmt/format.h>
+
+#endif  // !SMALLSTRING_MODULE_INTERFACE
+
 namespace small {
 #ifndef Assert
 #define Assert(condition, message) assert((condition) && (message))
 #endif
-namespace {
+// Not an unnamed namespace: entities there have internal linkage, and a C++20 module interface
+// cannot reference an internal-linkage entity from an exported inline function or template
+// ("'kMinAlignSize' has internal linkage and cannot be referenced from an exported ...").
+namespace detail {
 inline constexpr uint64_t kMinAlignSize = 8;  // 64 bits for modern cpu
 /**
  * @brief Aligns a value up to the next multiple of N
@@ -54,7 +108,10 @@ template <uint64_t N>
     return (n + N - 1) & static_cast<uint64_t>(-N);
 }
 
-}  // namespace
+}  // namespace detail
+
+using detail::AlignUpTo;
+using detail::kMinAlignSize;
 
 /**
  * @brief Storage strategy enumeration for small string optimization
@@ -5452,6 +5509,9 @@ template <typename Char,
 struct fmt::formatter<small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated, Growth>>
     : fmt::formatter<std::string_view>
 {
+    // Delegate to the string_view formatter, which parses and applies the format spec. A hand-rolled
+    // parse() that merely skips to '}' stores no state, so width, alignment, fill and precision are
+    // silently discarded -- fmt::format("{:>5}", small_string("foo")) would give "foo", not "  foo".
     using fmt::formatter<std::string_view>::parse;
 
     auto format(const small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated>& str,
@@ -5651,3 +5711,5 @@ struct hash<small::basic_small_string<Char, Buffer, Core, Traits, Allocator, Nul
 };
 
 }  // namespace std
+
+#endif  // owned by module smallstring

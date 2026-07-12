@@ -5485,19 +5485,16 @@ template <typename Char,
           template <typename, template <class, bool> class, class T, class A, bool N, float G> class Buffer,
           template <typename, bool> class Core, class Traits, class Allocator, bool NullTerminated, float Growth>
 struct fmt::formatter<small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated, Growth>>
+    : fmt::formatter<std::string_view>
 {
-    constexpr auto parse(fmt::format_parse_context& ctx) -> fmt::format_parse_context::iterator {
-        auto it = ctx.begin();
-        const auto end = ctx.end();
-        while (it != end && *it != '}') {
-            ++it;
-        }
-        return it;
-    }
+    // Delegate to the string_view formatter, which parses and applies the format spec. A hand-rolled
+    // parse() that merely skips to '}' stores no state, so width, alignment, fill and precision are
+    // silently discarded -- fmt::format("{:>5}", small_string("foo")) would give "foo", not "  foo".
+    using fmt::formatter<std::string_view>::parse;
 
     auto format(const small::basic_small_string<Char, Buffer, Core, Traits, Allocator, NullTerminated>& str,
                 fmt::format_context& ctx) const noexcept {
-        return fmt::format_to(ctx.out(), "{}", std::string_view{str.data(), str.size()});
+        return fmt::formatter<std::string_view>::format({str.data(), str.size()}, ctx);
     }
 };
 

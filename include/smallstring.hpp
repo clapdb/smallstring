@@ -30,9 +30,13 @@
 // sits in its global module fragment and a GMF is not re-exported, so `import smallstring;` alone would
 // silently take fmt away from every consumer the moment SMALLSTRING_USE_MODULE is turned on.
 //
-// Keeping the include here costs nothing -- fmt is textual on both sides of the module boundary (or a
-// module on both sides, under STDB_USE_FMT_MODULE), so the declarations are the same entities either
-// way.
+// Keeping the include here costs nothing -- fmt is textual on both sides of the module boundary.
+//
+// Under STDB_USE_FMT_MODULE it is textual on *one* side: the interface unit reads <fmt/format.h>
+// textually no matter what, and only the consumer imports. Those still meet, because fmt's module is
+// required to be built with FMT_ATTACH_TO_GLOBAL_MODULE, which leaves its declarations attached to
+// the global module -- the same entities the interface unit saw. smallstring.cppm #errors if that is
+// not so, and explains why it cannot simply `import fmt;` instead.
 #if defined(STDB_USE_FMT_MODULE)
 #ifndef STDB_FMT_IMPORTED
 #define STDB_FMT_IMPORTED 1

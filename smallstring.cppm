@@ -25,30 +25,10 @@ module;
 // declarations onward in its own BMI.
 #include <sys/types.h>
 
-// fmt is textual here, and stays textual even when the consumer imports it (STDB_USE_FMT_MODULE).
-// That asymmetry with the shim in smallstring.hpp is deliberate, and it rests on one thing:
-//
-//   fmt's module must be built with FMT_ATTACH_TO_GLOBAL_MODULE.
-//
-// That macro detaches every fmt declaration from module `fmt` (fmt's own words: "you can mix TUs
-// with either importing or #including the {fmt} API"). So the fmt::formatter this fragment sees and
-// the fmt::formatter an importing consumer sees are the *same* global-module entity, and the
-// fmt::formatter<basic_small_string> specialisation exported below is the one the consumer finds.
-//
-// It cannot be done the other way round. Reaching fmt by `import fmt;` here does not compile: the
-// specialisation derives from fmt::formatter<std::string_view>, and through an import that base
-// resolves to fmt's *primary* template -- "no member named 'parse'", deleted constructor. That is a
-// property of fmt itself, not of smallstring; a TU that does nothing but `import fmt;` and name
-// fmt::formatter<std::string_view> fails the same way, while the identical TU with a textual
-// <fmt/format.h> compiles.
-//
-// Without FMT_ATTACH_TO_GLOBAL_MODULE the mix really is unsound -- the consumer's `import fmt;`
-// meets the global-module fmt declarations baked into this BMI and clang rejects it, "declaration
-// 'basic_appender' attached to named module 'fmt' cannot be attached to other modules" -- so say so
-// here rather than let it surface as that error in someone else's translation unit.
-#if defined(STDB_USE_FMT_MODULE) && !defined(FMT_ATTACH_TO_GLOBAL_MODULE)
-#error "module smallstring needs fmt's module built with FMT_ATTACH_TO_GLOBAL_MODULE: it specialises fmt::formatter through a textual <fmt/format.h>, which only matches an imported fmt when fmt's declarations are attached to the global module."
-#endif
+// fmt is textual, here and everywhere else in smallstring -- the header we are about to read
+// specialises fmt::formatter, and it is the one heavy header that has to stay in this fragment. The
+// note at the top of include/smallstring.hpp explains why it is never an `import fmt;`, and asserts
+// the FMT_ATTACH_TO_GLOBAL_MODULE that lets a textual read here meet an imported fmt elsewhere.
 #include <fmt/format.h>
 
 export module smallstring;

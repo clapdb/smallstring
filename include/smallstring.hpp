@@ -13,6 +13,26 @@
  */
 
 #pragma once
+// smallstring reads fmt textually, always -- header-only, module consumer, module interface alike. It
+// never imports fmt, in any configuration.
+//
+// It can afford to be that blunt because fmt, if it is a module at all, has to be built with
+// FMT_ATTACH_TO_GLOBAL_MODULE: seastar reaches fmt through <fmt/format.h> in ~21 of its headers and
+// will keep doing so, so fmt's declarations must stay attached to the global module or nothing in the
+// tree links. That macro is precisely what makes textual and imported fmt the *same* entities ("you
+// can mix TUs with either importing or #including the {fmt} API" -- fmt's own words), so a textual
+// read here meets an imported fmt anywhere else in the program.
+//
+// The converse does not hold, which is why there is no `import fmt;` branch to balance this one: the
+// fmt::formatter<basic_small_string> specialisation below derives from fmt::formatter<std::string_view>,
+// and through an import that base resolves to fmt's *primary* template -- "no member named 'parse'",
+// deleted constructor. That is fmt's behaviour, not smallstring's (a TU that does nothing but
+// `import fmt;` and name fmt::formatter<std::string_view> fails identically), and it is why every
+// attempt to route this header's fmt through the module has been a bug.
+#if defined(STDB_USE_FMT_MODULE) && !defined(FMT_ATTACH_TO_GLOBAL_MODULE)
+#error "smallstring reads fmt textually and specialises fmt::formatter, so an fmt built as a C++20 module must be built with FMT_ATTACH_TO_GLOBAL_MODULE -- otherwise its declarations attach to module `fmt` and the textual ones here cannot match them."
+#endif
+
 // Owned by module `smallstring` when the consumer builds with modules (SMALLSTRING_USE_MODULE).
 //
 // Outside that module the include degrades to the import, so these declarations are not ALSO
@@ -30,21 +50,9 @@
 // sits in its global module fragment and a GMF is not re-exported, so `import smallstring;` alone would
 // silently take fmt away from every consumer the moment SMALLSTRING_USE_MODULE is turned on.
 //
-// Keeping the include here costs nothing -- fmt is textual on both sides of the module boundary.
-//
-// Under STDB_USE_FMT_MODULE it is textual on *one* side: the interface unit reads <fmt/format.h>
-// textually no matter what, and only the consumer imports. Those still meet, because fmt's module is
-// required to be built with FMT_ATTACH_TO_GLOBAL_MODULE, which leaves its declarations attached to
-// the global module -- the same entities the interface unit saw. smallstring.cppm #errors if that is
-// not so, and explains why it cannot simply `import fmt;` instead.
-#if defined(STDB_USE_FMT_MODULE)
-#ifndef STDB_FMT_IMPORTED
-#define STDB_FMT_IMPORTED 1
-import fmt;
-#endif
-#else
+// Keeping the include here costs nothing: it is the same <fmt/format.h> the interface unit read, and
+// under FMT_ATTACH_TO_GLOBAL_MODULE (see the top of this file) the same entities either way.
 #include <fmt/format.h>
-#endif
 
 import smallstring;
 
@@ -68,19 +76,8 @@ import smallstring;
 #include <type_traits>
 #include <utility>
 
-// fmt is textual here, and stays textual even when the rest of the build has fmt as a C++20 module
-// (STDB_USE_FMT_MODULE). This is the branch that carries the *body*, so it is the branch that
-// *defines* fmt::formatter<basic_small_string> -- and that definition derives from
-// fmt::formatter<std::string_view>. Reached through `import fmt;`, that base resolves to fmt's
-// primary template and the header does not compile: "no member named 'parse' in
-// 'fmt::formatter<std::basic_string_view<char>>'", deleted constructor.
-//
-// (The import is fine in the SMALLSTRING_USE_MODULE branch above, and only there, because that
-// branch never parses this body -- the specialisation arrives ready-made from the module, and the
-// consumer needs nothing from fmt but its declarations.)
-//
-// Mixing this textual fmt with an imported fmt elsewhere in the program is exactly what
-// FMT_ATTACH_TO_GLOBAL_MODULE is for; smallstring.cppm requires it and explains why.
+// This is the branch that carries the body, so it is the one that *defines* the formatter
+// specialisation -- the case the note at the top of this file is really about. Textual, always.
 #include <fmt/format.h>
 
 #endif  // !SMALLSTRING_MODULE_INTERFACE

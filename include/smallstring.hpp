@@ -2767,15 +2767,30 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
     template <bool Safe = true>
     constexpr auto append(const Char* s, size_t count) -> basic_small_string& {
         if (count == 0) [[unlikely]] {
-            // do nothing
             return *this;
         }
         if constexpr (Safe) {
             Assert(count <= std::numeric_limits<size_type>::max(), "count exceeds size_type maximum");
-            this->template allocate_more<buffer_type::Need0::No>(static_cast<size_type>(count));
+            if (count > buffer_type::idle_capacity()) {
+                const auto old_size = buffer_type::size();
+                const auto buffer_address = reinterpret_cast<std::uintptr_t>(buffer_type::get_buffer());
+                const auto source_address = reinterpret_cast<std::uintptr_t>(s);
+                const auto offset = source_address - buffer_address;
+                const bool aliased = source_address >= buffer_address &&
+                    (offset < old_size || (NullTerminated && offset == old_size));
+                if (aliased) {
+                    // Growth can free heap storage or overwrite inline storage.
+                    // Also preserve the old terminator when it is part of the source.
+                    this->template allocate_more<buffer_type::Need0::Yes>(static_cast<size_type>(count));
+                    s = buffer_type::get_buffer() + offset;
+                } else {
+                    this->template allocate_more<buffer_type::Need0::No>(static_cast<size_type>(count));
+                }
+            }
         }
 
-        std::memcpy(end(), s, count);
+        // The source can include the old terminator and overlap the destination.
+        std::memmove(end(), s, count);
         Assert(count <= std::numeric_limits<size_type>::max(), "count exceeds size_type maximum");
         buffer_type::increase_size(static_cast<size_type>(count));
         return *this;
@@ -2806,19 +2821,18 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
     constexpr auto append(InputIt first, InputIt last) -> basic_small_string& {
         static_assert(std::is_same_v<typename std::iterator_traits<InputIt>::value_type, Char>,
                       "the value type of the input iterator is not the same as the char type");
-        auto count = std::distance(first, last);
-        if (count == 0) [[unlikely]] {
-            // do nothing
-            return *this;
+        if constexpr (std::contiguous_iterator<InputIt>) {
+            const auto count = std::distance(first, last);
+            if (count == 0) return *this;
+            Assert(count >= 0 && static_cast<size_t>(count) <= std::numeric_limits<size_type>::max(),
+                   "count exceeds size_type maximum");
+            return append<Safe>(std::to_address(first), static_cast<size_t>(count));
+        } else {
+            // Non-contiguous iterators (including reverse iterators) can also
+            // refer into this string. Snapshot before mutating or reallocating it.
+            basic_small_string snapshot(first, last, buffer_type::get_allocator());
+            return append<Safe>(snapshot.data(), snapshot.size());
         }
-        Assert(count <= std::numeric_limits<size_type>::max(), "count exceeds size_type maximum");
-        auto size_type_count = static_cast<size_type>(count);
-        if constexpr (Safe) {
-            this->template allocate_more<buffer_type::Need0::No>(size_type_count);
-        }
-        std::copy(first, last, end());
-        buffer_type::increase_size(size_type_count);
-        return *this;
     }
 
     /**

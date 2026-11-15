@@ -3409,8 +3409,11 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @note Optimized single-character search
      */
     [[nodiscard]] constexpr auto find(Char ch, size_t pos = 0) const -> size_t {
-        auto* found = traits_type::find(data() + pos, size() - pos, ch);
-        return found == nullptr ? npos : size_t(found - data());
+        auto current_size = buffer_type::size();
+        if (pos >= current_size) return npos;
+        const auto* buffer_ptr = buffer_type::get_buffer();
+        const auto* found = traits_type::find(buffer_ptr + pos, current_size - pos, ch);
+        return found == nullptr ? npos : size_t(found - buffer_ptr);
     }
 
     /**

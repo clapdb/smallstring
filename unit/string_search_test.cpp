@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iterator>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -319,4 +320,37 @@ TEST_CASE("smallstring search with string_view and custom types") {
         CHECK(multi.rfind("abc", 5) == 3);
         CHECK(multi.rfind("abc", 2) == 0);
     }
+}
+
+TEST_CASE("character find rejects out-of-range positions") {
+    using small::small_string;
+    const small_string quoted("abc");
+    REQUIRE(quoted.find('\0', 4) == small_string::npos);
+    CHECK(quoted.find('b') == 1);
+    CHECK(quoted.find('b', 1) == 1);
+    CHECK(quoted.find('b', 2) == small_string::npos);
+
+    const size_t lengths[] = {0, 3, 6, 7, 255, 256, 16384};
+    for (size_t length : lengths) {
+        CAPTURE(length);
+        small_string str(length, 'a');
+        const size_t positions[] = {length, length + 1,
+                                   static_cast<size_t>(small_string::npos),
+                                   std::numeric_limits<size_t>::max()};
+        for (size_t pos : positions) {
+            CAPTURE(pos);
+            CHECK(str.find('\0', pos) == small_string::npos);
+            CHECK(str.find('a', pos) == small_string::npos);
+            CHECK(str.find('z', pos) == small_string::npos);
+        }
+        if (length != 0) {
+            str[length - 1] = 'z';
+            CHECK(str.find('z') == length - 1);
+            CHECK(str.find('z', length - 1) == length - 1);
+        }
+    }
+    const small_string binary("a\0b", 3);
+    CHECK(binary.find('\0') == 1);
+    CHECK(binary.find('\0', 1) == 1);
+    CHECK(binary.find('\0', 2) == small_string::npos);
 }

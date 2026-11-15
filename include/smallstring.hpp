@@ -2455,6 +2455,15 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
         if (index > old_size) [[unlikely]] {
             throw std::out_of_range("index is out of range");
         }
+        const auto buffer_address = reinterpret_cast<std::uintptr_t>(buffer_type::get_buffer());
+        const auto source_address = reinterpret_cast<std::uintptr_t>(str);
+        const auto offset = source_address - buffer_address;
+        if (source_address >= buffer_address &&
+            (offset < old_size || (NullTerminated && offset == old_size))) {
+            // Both reallocation and shifting the tail can invalidate the source.
+            basic_small_string snapshot(str, count, buffer_type::get_allocator());
+            return insert<Safe>(index, snapshot.data(), snapshot.size());
+        }
         // check if the capacity is enough
         if constexpr (Safe) {
             Assert(count <= std::numeric_limits<size_type>::max(), "count exceeds size_type maximum");
@@ -2537,30 +2546,20 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      */
     template <class InputIt, bool Safe = true>
     constexpr auto insert(const_iterator pos, InputIt first, InputIt last) -> iterator {
-        // static check the type of the input iterator
         static_assert(std::is_same_v<typename std::iterator_traits<InputIt>::value_type, Char>,
                       "the value type of the input iterator is not the same as the char type");
-        // calculate the count
-        auto count = std::distance(first, last);
-        if (count == 0) [[unlikely]] {
-            // do nothing
-            return const_cast<iterator>(pos);
+        const auto index = static_cast<size_t>(pos - cbegin());
+        if constexpr (std::contiguous_iterator<InputIt>) {
+            const auto count = std::distance(first, last);
+            if (count == 0) return begin() + index;
+            Assert(count >= 0 && static_cast<size_t>(count) <= std::numeric_limits<size_type>::max(),
+                   "count exceeds size_type maximum");
+            insert<Safe>(index, std::to_address(first), static_cast<size_t>(count));
+        } else {
+            basic_small_string snapshot(first, last, buffer_type::get_allocator());
+            insert<Safe>(index, snapshot.data(), snapshot.size());
         }
-        auto index = static_cast<size_t>(pos - begin());
-        auto size_type_count = static_cast<size_type>(count);
-        if constexpr (Safe) {
-            Assert(size_type_count <= std::numeric_limits<size_type>::max(), "count exceeds size_type maximum");
-            this->template allocate_more<buffer_type::Need0::No>(size_type_count);
-        }
-        // by now, the capacity is enough
-        if (index < size()) [[likely]] {
-            // move the data to the new position
-            std::memmove(data() + index + count, data() + index, size() - index);
-        }
-        // copy the new data
-        std::copy(first, last, data() + index);
-        buffer_type::increase_size(size_type_count);
-        return const_cast<iterator>(pos);
+        return begin() + index;
     }
 
     /**

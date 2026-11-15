@@ -3021,7 +3021,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
 
         if ((count >= old_size - pos) and count2 <= (cap - pos)) {  // count == npos still >= old_size - pos.
             // copy the data to pos, and no need to move the right part
-            std::memcpy(buffer_type::get_buffer() + pos, str, count2);
+            std::memmove(buffer_type::get_buffer() + pos, str, count2);
             auto new_size = pos + count2;
             Assert(new_size <= std::numeric_limits<size_type>::max(), "new size exceeds size_type maximum");
             buffer_type::set_size(static_cast<size_type>(new_size));
@@ -3029,7 +3029,7 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
         }
         if (count == count2) {
             // just replace
-            std::memcpy(buffer_type::get_buffer() + pos, str, count2);
+            std::memmove(buffer_type::get_buffer() + pos, str, count2);
             return *this;
         }
         // else, the count != count2, need to move the right part
@@ -3249,10 +3249,13 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
                  !std::is_convertible_v<const StringViewLike&, const Char*>)
     auto replace(size_t pos, size_t count, const StringViewLike& view, size_t pos2, size_t count2 = npos)
       -> basic_small_string& {
-        if (count2 == npos) {
-            count2 = view.size() - pos2;
+        if (pos2 > view.size()) [[unlikely]] {
+            throw std::out_of_range("replace: pos2 is out of range");
         }
-        return replace(pos, count, view.data() + pos, count2);
+        count2 = std::min(count2, view.size() - pos2);
+        const auto* source = view.data();
+        if (pos2 != 0) source += pos2;
+        return replace(pos, count, source, count2);
     }
 
     /**

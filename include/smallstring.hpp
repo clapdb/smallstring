@@ -3173,50 +3173,24 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
     auto replace(const_iterator first, const_iterator last, InputIt first2, InputIt last2) -> basic_small_string& {
         static_assert(std::is_same_v<typename std::iterator_traits<InputIt>::value_type, Char>,
                       "the value type of the input iterator is not the same as the char type");
-        Assert(first2 <= last2, "the range is valid");
         auto pos = std::distance(cbegin(), first);
         auto count = std::distance(first, last);
         if (count < 0) [[unlikely]] {
             throw std::invalid_argument("the range is invalid");
         }
-        auto count2 = std::distance(first2, last2);
-        if (count2 == 0) [[unlikely]] {
-            // just delete the right part
-            erase(first, last);
-            return *this;
+        if constexpr (std::contiguous_iterator<InputIt>) {
+            const auto count2 = std::distance(first2, last2);
+            Assert(count2 >= 0, "the source range is invalid");
+            if (count2 == 0) return erase(static_cast<size_t>(pos), static_cast<size_t>(count));
+            return replace(static_cast<size_t>(pos), static_cast<size_t>(count),
+                           std::to_address(first2), static_cast<size_t>(count2));
+        } else {
+            // Snapshot non-contiguous sources before writing into this string.
+            // The constructor also consumes single-pass input iterators once.
+            basic_small_string snapshot(first2, last2, buffer_type::get_allocator());
+            return replace(static_cast<size_t>(pos), static_cast<size_t>(count),
+                           snapshot.data(), snapshot.size());
         }
-
-        auto [cap, old_size] = buffer_type::get_capacity_and_size();
-
-        if (last == end() and count2 <= (cap - pos)) {
-            // copy the data to pos, and no need to move the right part
-            std::copy(first2, last2, data() + pos);
-            auto new_size = pos + count2;
-            Assert(new_size <= std::numeric_limits<size_type>::max(), "new size exceeds size_type maximum");
-            buffer_type::set_size(static_cast<size_type>(new_size));
-            return *this;
-        }
-
-        if (count == count2) {
-            // just replace
-            std::copy(first2, last2, data() + pos);
-            return *this;
-        }
-
-        // else, the count != count2, need to move the right part
-        // init a new string
-        basic_small_string ret{initialized_later{}, static_cast<size_type>(old_size - count + count2),
-                               buffer_type::get_allocator()};
-        Char* p = ret.data();
-        // copy the left party
-        std::copy(cbegin(), first, ret.begin());
-        p += pos;
-        // copy the new data
-        std::copy(first2, last2, p);
-        p += count2;
-        std::copy(last, cend(), p);
-        *this = std::move(ret);
-        return *this;
     }
 
     /**

@@ -1700,8 +1700,19 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      */
     template <class InputIt>
     constexpr basic_small_string(InputIt first, InputIt last, [[maybe_unused]] const Allocator& allocator = Allocator())
-        : basic_small_string(initialized_later{}, static_cast<size_type>(std::distance(first, last)), allocator) {
-        std::copy(first, last, begin());
+        : basic_small_string(initialized_later{}, [&] {
+              if constexpr (std::forward_iterator<InputIt>) {
+                  return static_cast<size_type>(std::distance(first, last));
+              } else {
+                  return size_type{0};
+              }
+          }(), allocator) {
+        if constexpr (std::forward_iterator<InputIt>) {
+            std::copy(first, last, begin());
+        } else {
+            // Input iterator copies can share state; never pre-consume the range.
+            for (; first != last; ++first) push_back(*first);
+        }
     }
 
     /**

@@ -2004,22 +2004,26 @@ class basic_small_string : private Buffer<Char, Core, Traits, Allocator, NullTer
      * @param first Iterator to beginning of range
      * @param last Iterator to end of range
      * @return Reference to this string after assignment
-     * @note Distance calculated using std::distance, content copied using std::copy
+     * @note Contiguous ranges use overlap-safe assignment; other ranges are snapshotted
      */
     template <class InputIt, bool Safe = true>
     auto assign(InputIt first, InputIt last) -> basic_small_string& {
-        auto count = std::distance(first, last);
-        Assert(count >= 0 and count < std::numeric_limits<size_type>::max(),
-               "assign: count should be non-negative and less than the max value of size_type");
-        auto size_type_count = static_cast<size_type>(count);
-        if constexpr (Safe) {
-            this->template buffer_reserve<buffer_type::Need0::No, false>(size_type_count);
+        if constexpr (std::contiguous_iterator<InputIt> &&
+                      std::is_same_v<typename std::iterator_traits<InputIt>::value_type, Char>) {
+            const auto count = std::distance(first, last);
+            Assert(count >= 0 and count < std::numeric_limits<size_type>::max(),
+                   "assign: count should be non-negative and less than the max value of size_type");
+            if (count == 0) {
+                clear();
+                return *this;
+            }
+            return assign<Safe>(std::to_address(first), static_cast<size_type>(count));
+        } else {
+            // Reverse and other non-contiguous iterators can alias this string.
+            // Snapshot before writing; this also consumes input iterators once.
+            basic_small_string snapshot(first, last, buffer_type::get_allocator());
+            return assign<Safe>(snapshot.data(), snapshot.size());
         }
-        if (size_type_count > 0) {
-            std::copy(first, last, begin());
-        }
-        buffer_type::set_size(size_type_count);
-        return *this;
     }
 
     /**
